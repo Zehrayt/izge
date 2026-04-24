@@ -1,5 +1,6 @@
 package com.lensd.izge.controller;
 
+import com.lensd.izge.dto.CanvasDTO;
 import com.lensd.izge.dto.KeystrokeDTO;
 import com.lensd.izge.service.AnalysisService;
 import org.springframework.web.bind.annotation.*;
@@ -33,6 +34,21 @@ public class AnalysisController {
         } catch (Exception e) {
             e.printStackTrace();
             return "Veri kaydedilirken hata oluştu!";
+        }
+    }
+
+    @PostMapping("/canvas")
+    public String receiveCanvasData(@RequestBody CanvasDTO canvasData) {
+        try {
+            // Servis üzerinden veritabanına kaydetme
+            analysisService.saveCanvasData(canvasData.getTargetLetter(), canvasData.getCoordinatesJson());
+            
+            System.out.println("Çizim verisi (Canvas) veritabanına başarıyla kaydedildi! Hedef Harf: " + canvasData.getTargetLetter());
+            return "Çizim verisi başarıyla alındı ve kaydedildi!";
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Çizim verisi kaydedilirken hata oluştu!";
         }
     }
 }
