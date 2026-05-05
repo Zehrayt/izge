@@ -1,10 +1,15 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// Resim yolları
+// Resim ve İkon Dosyalarını İçe Aktarma
 import logo from '../assets/images/IMG_3031.jpeg';
 import cocukResmi from '../assets/images/IMG_3029.png';
 import arkaPlan from '../assets/images/alt.png';
+
+// Arkadaşının istediği ikonlar
+import analizIkon from '../assets/images/analiz.png';
+import biyonikIkon from '../assets/images/biyonik.png';
+import imlecIkon from '../assets/images/imleç.png';
 
 export default function AnaSayfa() {
   const navigate = useNavigate();
@@ -30,10 +35,9 @@ export default function AnaSayfa() {
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: '20px clamp(20px, 5vw, 80px)',
-        backgroundColor: 'rgba(255, 255, 255, 0.1)', // Çok hafif belirginlik
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
         backdropFilter: 'blur(5px)'
       }}>
-        {/* Sol taraf: Logo */}
         <div onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
           <img 
             src={logo} 
@@ -42,11 +46,10 @@ export default function AnaSayfa() {
           />
         </div>
 
-        {/* Sağ taraf: Navigasyon Linkleri */}
         <nav style={{ display: 'flex', gap: '30px', fontWeight: 'bold' }}>
           <span style={navLinkStyle} onClick={() => navigate('/')}>Ana Sayfa</span>
-          <span style={navLinkStyle}>Context</span>
-          <span style={navLinkStyle}>Hakkımızda</span>
+          <span style={navLinkStyle} onClick={() => navigate('/analiz')}>Context</span>
+          <span style={navLinkStyle} onClick={() => navigate('/cizim')}>Hakkımızda</span>
         </nav>
       </header>
 
@@ -74,7 +77,7 @@ export default function AnaSayfa() {
                 marginBottom: '25px',
                 color: '#2c3e50'
             }}>
-              Yolculuğunu <br /> 
+              Yolculuğunu <br />
               <span style={{ color: izgeTuruncu }}>İzge</span> ile Güçlendir
             </h1>
             
@@ -117,29 +120,31 @@ export default function AnaSayfa() {
         </div>
       </section>
 
-      {/* ÖZELLİKLER (ŞEFFAF VE KART GÖRÜNÜMÜSÜZ) */}
+      {/* ÖZELLİKLER (ŞEFFAF VE GÖRSEL DESTEKLİ) */}
       <section style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-        gap: '40px', 
+        display: 'flex', 
+        flexWrap: 'wrap', 
+        justifyContent: 'space-around', // İkonları ekrana eşit aralıklarla yayar
+        gap: '40px', // Aralarındaki minimum güvenli boşluk
         padding: '40px clamp(20px, 5vw, 80px)',
-        maxWidth: '1300px',
+        width: '100%',
+        maxWidth: '1400px', // Daha geniş bir alana yayılmaları için limiti artırdık
         margin: '0 auto'
       }}>
         <div style={featureStyle}>
-          <div style={{fontSize: '55px', marginBottom: '20px'}}>🎯</div>
+          <img src={imlecIkon} alt="Akıllı İmleç" style={iconStyle} />
           <h3 style={featureTitleStyle}>Akıllı İmleç Analizi</h3>
           <p style={featureTextStyle}>Kullanıcının okuma sırasındaki göz ve imleç hareketlerini takip ederek raporlar.</p>
         </div>
 
         <div style={featureStyle}>
-          <div style={{fontSize: '55px', marginBottom: '20px'}}>📖</div>
+          <img src={biyonikIkon} alt="Biyonik Okuma" style={iconStyle} />
           <h3 style={featureTitleStyle}>Adaptif Biyonik Okuma</h3>
           <p style={featureTextStyle}>Metinleri disleksi dostu formata dönüştürerek okuma hızını artırır.</p>
         </div>
 
         <div style={featureStyle}>
-          <div style={{fontSize: '55px', marginBottom: '20px'}}>📊</div>
+          <img src={analizIkon} alt="Gelişim Takibi" style={iconStyle} />
           <h3 style={featureTitleStyle}>Gelişim Takibi</h3>
           <p style={featureTextStyle}>Okuma performansını haftalık grafiklerle sunarak gelişimi takip eder.</p>
         </div>
@@ -148,7 +153,6 @@ export default function AnaSayfa() {
   );
 }
 
-// STİL OBJELERİ
 const navLinkStyle = {
   cursor: 'pointer',
   fontSize: '1.1rem',
@@ -169,13 +173,24 @@ const buttonStyle = {
   transition: 'all 0.3s ease'
 };
 
+const iconStyle = {
+  height: '150px',
+  width: '150px',
+  objectFit: 'contain',
+  marginBottom: '1px'
+};
+
 const featureStyle = {
-  padding: '20px',
+  padding: '10px', 
   textAlign: 'center',
-  // Arka plan ve gölge kaldırıldı, sadece içerik kaldı
   backgroundColor: 'transparent',
   border: 'none',
-  boxShadow: 'none'
+  boxShadow: 'none',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  flex: '1 1 300px', // Dar ekranda (telefonda) otomatik olarak alt alta geçmesini sağlar
+  maxWidth: '350px'  // Yazıların çok fazla yayılmasını engeller
 };
 
 const featureTitleStyle = {
@@ -189,5 +204,7 @@ const featureTextStyle = {
   color: '#4a4a4a',
   fontSize: '1.1rem',
   lineHeight: '1.5',
-  fontWeight: '500'
+  fontWeight: '500',
+  maxWidth: '260px',
+  margin: '0 auto'
 };
