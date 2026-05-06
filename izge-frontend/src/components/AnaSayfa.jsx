@@ -1,12 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// Resim ve İkon Dosyalarını İçe Aktarma
 import logo from '../assets/images/IMG_3031.jpeg';
 import cocukResmi from '../assets/images/IMG_3029.png';
 import arkaPlan from '../assets/images/alt.png';
 
-// Arkadaşının istediği ikonlar
 import analizIkon from '../assets/images/analiz.png';
 import biyonikIkon from '../assets/images/biyonik.png';
 import imlecIkon from '../assets/images/imleç.png';
@@ -29,7 +27,6 @@ export default function AnaSayfa() {
       flexDirection: 'column'
     }}>
       
-      {/* HEADER (ÜST MENÜ) */}
       <header style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -48,12 +45,13 @@ export default function AnaSayfa() {
 
         <nav style={{ display: 'flex', gap: '30px', fontWeight: 'bold' }}>
           <span style={navLinkStyle} onClick={() => navigate('/')}>Ana Sayfa</span>
+          <span style={navLinkStyle} onClick={() => navigate('/analiz')}>Analiz</span>
+          <span style={navLinkStyle} onClick={() => navigate('/rapor')}>Gelişim Raporu</span>
           <span style={navLinkStyle} onClick={() => navigate('/analiz')}>Context</span>
           <span style={navLinkStyle} onClick={() => navigate('/cizim')}>Hakkımızda</span>
         </nav>
       </header>
 
-      {/* ANA İÇERİK (HERO SECTION) */}
       <section style={{ 
         width: '100%',
         maxWidth: '1200px',
