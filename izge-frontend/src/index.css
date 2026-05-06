@@ -1,0 +1,96 @@
+/* Google Fonts - Poppins */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+
+:root {
+  /* Ana Renk Paleti */
+  --izge-mavi: #3498db;
+  --izge-turuncu: #e67e22;
+  --izge-koyu: #2c3e50;
+  --izge-gri: #5f6769;
+  --izge-arka-plan: #f6f4f0;
+  
+  /* Yazı Tipleri */
+  font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: var(--izge-koyu);
+  background-color: #ffffff;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  background-color: #ffffff;
+  overflow-x: hidden; /* Yatayda kaydırma çubuğu çıkmasını kesin olarak engeller */
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  color: var(--izge-koyu);
+}
+
+a {
+  font-weight: 500;
+  color: var(--izge-mavi);
+  text-decoration: inherit;
+  transition: color 0.25s;
+}
+
+a:hover {
+  color: #2980b9;
+}
+
+button {
+  font-family: 'Poppins', sans-serif;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 600;
+  background-color: var(--izge-mavi);
+  color: white;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+}
+
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+/* Dark Mode Desteği (İsteğe Bağlı) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #f6f4f0;
+    background-color: #1a1a1a;
+  }
+  body {
+    background-color: #1a1a1a;
+  }
+}
