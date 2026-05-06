@@ -34,7 +34,7 @@ export default function AnaSayfa() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '5px clamp(20px, 5vw, 80px)',
+          padding: '10px clamp(20px, 5vw, 80px)',
           backgroundColor: 'rgba(255, 255, 255, 0.1)',
           backdropFilter: 'blur(5px)'
         }}>
@@ -42,7 +42,7 @@ export default function AnaSayfa() {
             <img 
               src={logo} 
               alt="İzge Logo" 
-              style={{ height: '100px', objectFit: 'contain' }} 
+              style={{ height: '60px', objectFit: 'contain' }} 
             />
           </div>
 
