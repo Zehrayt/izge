@@ -1,54 +1,35 @@
 package com.lensd.izge.controller;
 
-import com.lensd.izge.dto.CanvasDTO;
-import com.lensd.izge.dto.KeystrokeDTO;
+import com.lensd.izge.dto.AnalizRequestDTO;
+import com.lensd.izge.dto.AnalizResponseDTO;
 import com.lensd.izge.service.AnalysisService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
-import com.fasterxml.jackson.databind.ObjectMapper; // JSON dönüştürme için
 
 @RestController
-@RequestMapping("/api/analysis")
-@CrossOrigin(origins = "*") 
+@RequestMapping("/api/analiz")
+@CrossOrigin(origins = "*") // React'ten (localhost:5173 vb.) gelen isteklere izin verir (CORS hatasını önler)
 public class AnalysisController {
 
-    private final AnalysisService analysisService;
+    @Autowired
+    private AnalysisService analysisService;
 
-    public AnalysisController(AnalysisService analysisService) {
-        this.analysisService = analysisService;
-    }
-
-    @PostMapping("/keystroke")
-    public String receiveKeystroke(@RequestBody List<KeystrokeDTO> keystrokeData) {
+    @PostMapping("/kaydet")
+    public ResponseEntity<AnalizResponseDTO> kaydetVeAnalizEt(
+            @RequestParam(required = false, defaultValue = "anonim_kullanici") String userId,
+            @RequestBody AnalizRequestDTO request) {
+        
         try {
-            // Gelen DTO listesini veritabanına yazmak için tek bir JSON String'e çevirme
-            ObjectMapper mapper = new ObjectMapper();
-            String jsonString = mapper.writeValueAsString(keystrokeData);
+            // Verileri kaydet ve matematiksel analizi yap
+            AnalizResponseDTO response = analysisService.evaluateAnalysis(userId, request);
             
-            // Servis üzerinden veritabanına kaydetme (!!!!!Şimdilik userId 'test_user')
-            analysisService.saveKeystrokeData("test_user", jsonString);
-            
-            System.out.println("Veritabanına başarıyla kaydedildi! Veri boyutu: " + keystrokeData.size());
-            return "Veri başarıyla alındı ve veritabanına kaydedildi!";
+            // Sonucu HTTP 200 (OK) statüsü ile React'e gönder
+            return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            e.printStackTrace();
-            return "Veri kaydedilirken hata oluştu!";
-        }
-    }
-
-    @PostMapping("/canvas")
-    public String receiveCanvasData(@RequestBody CanvasDTO canvasData) {
-        try {
-            // Servis üzerinden veritabanına kaydetme
-            analysisService.saveCanvasData(canvasData.getTargetLetter(), canvasData.getCoordinatesJson());
-            
-            System.out.println("Çizim verisi (Canvas) veritabanına başarıyla kaydedildi! Hedef Harf: " + canvasData.getTargetLetter());
-            return "Çizim verisi başarıyla alındı ve kaydedildi!";
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            return "Çizim verisi kaydedilirken hata oluştu!";
+            System.err.println("Analiz sırasında hata: " + e.getMessage());
+            return ResponseEntity.internalServerError().build();
         }
     }
 }

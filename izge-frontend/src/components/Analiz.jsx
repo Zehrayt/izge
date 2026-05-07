@@ -22,26 +22,6 @@ const DINLEME_METINLER = [
 
 const CIZIM_HARFLER = ['b', 'd', 'p', 'q'];
 const CIZIM_KELIMELER = ['baba', 'dede', 'para', 'kalem'];
-const DINLEME_KELIMELER = ['bulut', 'deniz', 'araba', 'elma', 'kalem'];
-
-// Levenshtein mesafesi
-function levenshtein(a, b) {
-  const m = a.length, n = b.length;
-  const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-  for (let i = 1; i <= m; i++)
-    for (let j = 1; j <= n; j++)
-      dp[i][j] = a[i - 1] === b[j - 1]
-        ? dp[i - 1][j - 1]
-        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-  return dp[m][n];
-}
-
-function hataYuzdesi(referans, yazilan) {
-  if (!referans) return 0;
-  const dist = levenshtein(referans.toLowerCase(), yazilan.toLowerCase());
-  return Math.min(100, Math.round((dist / referans.length) * 100));
-}
 
 // ─── ANA BİLEŞEN ─────────────────────────────────────────────────────────────
 export default function Analiz() {
@@ -55,7 +35,7 @@ export default function Analiz() {
   const [klavyeIndex, setKlavyeIndex] = useState(0);
   const [dinleIndex, setDinleIndex] = useState(0);
   const [yazılanMetin, setYazılanMetin] = useState('');
-  const [klavyeSonuclar, setKlavyeSonuclar] = useState([]); // {tip, referans, yazilan, hata}
+  const [klavyeHamVeriler, setKlavyeHamVeriler] = useState([]); // Backend'e gidecek liste
   const [sesOynuyor, setSesOynuyor] = useState(false);
   const [klavyeTamamlandi, setKlavyeTamamlandi] = useState(false);
 
@@ -70,11 +50,15 @@ export default function Analiz() {
   const [hedefHarf, setHedefHarf] = useState(0);
   const [hedefKelimeBas, setHedefKelimeBas] = useState(0);
   const [hedefKelime, setHedefKelime] = useState(0);
-  const [cizimSonuclar, setCizimSonuclar] = useState([]);
+  const [cizimHamVeriler, setCizimHamVeriler] = useState([]); // Backend'e gidecek liste
   const [koordinatlar, setKoordinatlar] = useState([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [cizimTamamlandi, setCizimTamamlandi] = useState(false);
   const canvasRef = useRef(null);
+
+  // ── Backend Sonuç State'i ──
+  const [backendSonuc, setBackendSonuc] = useState(null);
+  const [yukleniyor, setYukleniyor] = useState(false);
 
   // Sesli okuma (Web Speech API)
   const sesliOku = (metin) => {
@@ -111,25 +95,20 @@ export default function Analiz() {
   };
 
   const klavyeIlerle = () => {
-    const referans = klavyeAlt === 'yaz'
-      ? KLAVYE_METINLER[klavyeIndex]
-      : DINLEME_METINLER[dinleIndex];
+    const referans = klavyeAlt === 'yaz' ? KLAVYE_METINLER[klavyeIndex] : DINLEME_METINLER[dinleIndex];
 
-    const aralikOrt = tusZamanlari.current.length
-      ? tusZamanlari.current.reduce((a, b) => a + b, 0) / tusZamanlari.current.length
-      : 0;
-
-    const sonuc = {
+    // Backend'e gidecek DTO formatı
+    const hamVeri = {
       tip: klavyeAlt,
-      referans,
-      yazilan: yazılanMetin,
-      hata: hataYuzdesi(referans, yazılanMetin),
-      backspace: backspaceSayisi.current,
-      aralikOrt: Math.round(aralikOrt),
+      referansMetin: referans,
+      yazilanMetin: yazılanMetin,
+      tusAraliklari: [...tusZamanlari.current],
+      silmeSayisi: backspaceSayisi.current
     };
 
-    const yeniSonuclar = [...klavyeSonuclar, sonuc];
-    setKlavyeSonuclar(yeniSonuclar);
+    setKlavyeHamVeriler(prev => [...prev, hamVeri]);
+
+    // Temizle
     setYazılanMetin('');
     tusZamanlari.current = [];
     sonTusZamani.current = null;
@@ -140,7 +119,6 @@ export default function Analiz() {
       if (klavyeIndex < KLAVYE_METINLER.length - 1) {
         setKlavyeIndex(prev => prev + 1);
       } else {
-        // Yazma bitti, dinlemeye geç
         setKlavyeAlt('dinle');
         setKlavyeIndex(0);
       }
@@ -178,7 +156,7 @@ export default function Analiz() {
     ctx.beginPath();
     ctx.moveTo(x, y);
     setIsDrawing(true);
-    setKoordinatlar(prev => [...prev, [x, y, Date.now()]]);
+    setKoordinatlar(prev => [...prev, { x, y, time: Date.now() }]);
   }, []);
 
   const draw = useCallback((e) => {
@@ -189,7 +167,7 @@ export default function Analiz() {
     const ctx = canvas.getContext('2d');
     ctx.lineTo(x, y);
     ctx.stroke();
-    setKoordinatlar(prev => [...prev, [x, y, Date.now()]]);
+    setKoordinatlar(prev => [...prev, { x, y, time: Date.now() }]);
   }, [isDrawing]);
 
   const stopDrawing = useCallback(() => setIsDrawing(false), []);
@@ -201,31 +179,12 @@ export default function Analiz() {
     setKoordinatlar([]);
   };
 
-  const cizimMetrikHesapla = (koords) => {
-    if (koords.length < 2) return { titreme: 0, duraksamaSayisi: 0, hiz: 0 };
-    let titreme = 0;
-    let duraksamaSayisi = 0;
-    for (let i = 1; i < koords.length - 1; i++) {
-      const dx1 = koords[i][0] - koords[i - 1][0];
-      const dy1 = koords[i][1] - koords[i - 1][1];
-      const dx2 = koords[i + 1][0] - koords[i][0];
-      const dy2 = koords[i + 1][1] - koords[i][1];
-      const aci = Math.abs(Math.atan2(dy2, dx2) - Math.atan2(dy1, dx1));
-      if (aci > Math.PI / 4) titreme++;
-      const dt = koords[i + 1][2] - koords[i][2];
-      if (dt > 300) duraksamaSayisi++;
-    }
-    const sure = koords[koords.length - 1][2] - koords[0][2];
-    const hiz = sure > 0 ? Math.round(koords.length / (sure / 1000)) : 0;
-    return { titreme, duraksamaSayisi, hiz };
-  };
-
   const cizimIlerle = () => {
     if (koordinatlar.length === 0) {
       alert('Lütfen önce çizim yapınız!');
       return;
     }
-    const metrik = cizimMetrikHesapla(koordinatlar);
+
     let hedef = '';
     let tip = '';
     if (cizimAdim === 0) {
@@ -239,9 +198,14 @@ export default function Analiz() {
       tip = 'kelime';
     }
 
-    const yeniSonuc = { tip, hedef, ...metrik, koordinatSayisi: koordinatlar.length };
-    const yeniSonuclar = [...cizimSonuclar, yeniSonuc];
-    setCizimSonuclar(yeniSonuclar);
+    // Backend'e gidecek DTO formatı
+    const yeniHamCizim = {
+      tip: tip,
+      hedefKarakter: hedef,
+      koordinatlar: [...koordinatlar] 
+    };
+
+    setCizimHamVeriler(prev => [...prev, yeniHamCizim]);
     temizleCanvas();
 
     // İlerle
@@ -250,61 +214,59 @@ export default function Analiz() {
         setCizimTekrar(prev => prev + 1);
       } else {
         setCizimTekrar(0);
-        if (hedefHarf < CIZIM_HARFLER.length - 1) {
-          setHedefHarf(prev => prev + 1);
-        } else {
-          setCizimAdim(1);
-          setHedefHarf(0);
-        }
+        if (hedefHarf < CIZIM_HARFLER.length - 1) setHedefHarf(prev => prev + 1);
+        else { setCizimAdim(1); setHedefHarf(0); }
       }
     } else if (cizimAdim === 1) {
       if (cizimTekrar < 2) {
         setCizimTekrar(prev => prev + 1);
       } else {
         setCizimTekrar(0);
-        if (hedefKelimeBas < CIZIM_KELIMELER.length - 1) {
-          setHedefKelimeBas(prev => prev + 1);
-        } else {
-          setCizimAdim(2);
-          setHedefKelimeBas(0);
-        }
+        if (hedefKelimeBas < CIZIM_KELIMELER.length - 1) setHedefKelimeBas(prev => prev + 1);
+        else { setCizimAdim(2); setHedefKelimeBas(0); }
       }
     } else {
       if (cizimTekrar < 2) {
         setCizimTekrar(prev => prev + 1);
       } else {
         setCizimTekrar(0);
-        if (hedefKelime < CIZIM_KELIMELER.length - 1) {
-          setHedefKelime(prev => prev + 1);
-        } else {
-          setCizimTamamlandi(true);
-        }
+        if (hedefKelime < CIZIM_KELIMELER.length - 1) setHedefKelime(prev => prev + 1);
+        else { setCizimTamamlandi(true); }
       }
     }
   };
 
-  // ── Sonuç hesapla ──
-  const sonucHesapla = () => {
-    const klavyeHataOrt = klavyeSonuclar.length
-      ? Math.round(klavyeSonuclar.reduce((a, b) => a + b.hata, 0) / klavyeSonuclar.length)
-      : 0;
-    const backspaceOrt = klavyeSonuclar.length
-      ? Math.round(klavyeSonuclar.reduce((a, b) => a + b.backspace, 0) / klavyeSonuclar.length)
-      : 0;
-    const titremeOrt = cizimSonuclar.length
-      ? Math.round(cizimSonuclar.reduce((a, b) => a + b.titreme, 0) / cizimSonuclar.length)
-      : 0;
-    const duraksamaOrt = cizimSonuclar.length
-      ? Math.round(cizimSonuclar.reduce((a, b) => a + b.duraksamaSayisi, 0) / cizimSonuclar.length)
-      : 0;
+  // ─── VERİLERİ BACKEND'E GÖNDERME ───
+  const sonuclariGonderVeGoster = async () => {
+    setYukleniyor(true);
+    setAdim('sonuc');
 
-    // Risk skoru (0-100)
-    let risk = 0;
-    risk += Math.min(40, klavyeHataOrt * 0.8);
-    risk += Math.min(20, backspaceOrt * 2);
-    risk += Math.min(25, titremeOrt * 1.5);
-    risk += Math.min(15, duraksamaOrt * 2);
-    return { klavyeHataOrt, backspaceOrt, titremeOrt, duraksamaOrt, risk: Math.round(risk) };
+    const payload = {
+      klavyeAnalizleri: klavyeHamVeriler,
+      cizimAnalizleri: cizimHamVeriler
+    };
+
+    try {
+      // Backend'e POST isteği
+      const response = await fetch('http://localhost:8080/api/analiz/kaydet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        throw new Error("Sunucu hatası: " + response.status);
+      }
+
+      const data = await response.json();
+      setBackendSonuc(data); // Java'dan dönen AnalizResponseDTO
+      setYukleniyor(false);
+
+    } catch (error) {
+      console.error("Backend'e bağlanırken hata oluştu:", error);
+      alert("Sonuçlar hesaplanırken sunucuya bağlanılamadı. Lütfen Spring Boot uygulamanızın çalıştığından emin olun.");
+      setYukleniyor(false);
+    }
   };
 
   // ── Render Yardımcıları ──
@@ -353,118 +315,86 @@ export default function Analiz() {
   const ilerlemeYuzdesi = () => {
     if (adim === 'klavye') {
       const toplam = KLAVYE_METINLER.length + DINLEME_METINLER.length;
-      return Math.round((klavyeSonuclar.length / toplam) * 50);
+      return Math.round((klavyeHamVeriler.length / toplam) * 50);
     }
     if (adim === 'cizim') {
       const toplam = CIZIM_HARFLER.length * 3 + CIZIM_KELIMELER.length * 3 + CIZIM_KELIMELER.length * 3;
-      return 50 + Math.round((cizimSonuclar.length / toplam) * 50);
+      return 50 + Math.round((cizimHamVeriler.length / toplam) * 50);
     }
     return 100;
   };
 
-  // ─── SONUÇ EKRANI ──────────────────────────────────────────────────────────
+  // ─── SONUÇ EKRANI (BACKEND BEKLENİYOR) ─────────────────────────────────────
   if (adim === 'sonuc') {
-    const { klavyeHataOrt, backspaceOrt, titremeOrt, duraksamaOrt, risk } = sonucHesapla();
-    const riskRenk = risk < 30 ? '#27ae60' : risk < 60 ? '#e67e22' : '#e74c3c';
-    const riskLabel = risk < 30 ? 'Düşük Risk' : risk < 60 ? 'Orta Risk' : 'Yüksek Risk';
     return (
       <div style={s.sayfa}>
         <Header navigate={navigate} />
         <div style={s.icerik}>
           <div style={s.baslik}>
             <h1 style={s.h1}>Analiz <span style={{ color: '#e67e22' }}>Sonuçları</span></h1>
-            <p style={s.altBaslik}>Tüm testler tamamlandı. İşte değerlendirmen:</p>
           </div>
 
-          {/* Risk Skoru */}
-          <div style={{ ...s.kart, textAlign: 'center', marginBottom: 32 }}>
-            <p style={{ fontSize: '1rem', color: '#7f8c8d', marginBottom: 8, fontWeight: 600 }}>GENEL RİSK SKORU</p>
-            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="160" height="160" viewBox="0 0 160 160">
-                <circle cx="80" cy="80" r="65" fill="none" stroke="#f0f0f0" strokeWidth="14" />
-                <circle cx="80" cy="80" r="65" fill="none" stroke={riskRenk} strokeWidth="14"
-                  strokeDasharray={`${2 * Math.PI * 65 * risk / 100} ${2 * Math.PI * 65 * (1 - risk / 100)}`}
-                  strokeLinecap="round" strokeDashoffset={2 * Math.PI * 65 * 0.25}
-                  style={{ transition: 'stroke-dasharray 1s ease' }} />
-              </svg>
-              <div style={{ position: 'absolute', textAlign: 'center' }}>
-                <div style={{ fontSize: '2.4rem', fontWeight: 900, color: riskRenk }}>{risk}</div>
-                <div style={{ fontSize: '0.8rem', color: '#999', fontWeight: 600 }}>/ 100</div>
+          {yukleniyor || !backendSonuc ? (
+            <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+              <div style={{ fontSize: '4rem', marginBottom: '20px', animation: 'spin 2s linear infinite' }}>⏳</div>
+              <h2 style={{ color: '#2c3e50' }}>Verileriniz İnceleniyor...</h2>
+              <p style={{ color: '#7f8c8d' }}>Yapay zeka modellerimiz klavye ritminizi ve çizimlerinizi analiz ediyor.</p>
+            </div>
+          ) : (
+            <>
+              {/* Risk Skoru */}
+              <div style={{ ...s.kart, textAlign: 'center', marginBottom: 32 }}>
+                <p style={{ fontSize: '1rem', color: '#7f8c8d', marginBottom: 8, fontWeight: 600 }}>GENEL RİSK SKORU</p>
+                <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="160" height="160" viewBox="0 0 160 160">
+                    <circle cx="80" cy="80" r="65" fill="none" stroke="#f0f0f0" strokeWidth="14" />
+                    <circle cx="80" cy="80" r="65" fill="none" 
+                      stroke={backendSonuc.riskSkoru < 30 ? '#27ae60' : backendSonuc.riskSkoru < 60 ? '#e67e22' : '#e74c3c'} 
+                      strokeWidth="14"
+                      strokeDasharray={`${2 * Math.PI * 65 * backendSonuc.riskSkoru / 100} ${2 * Math.PI * 65 * (1 - backendSonuc.riskSkoru / 100)}`}
+                      strokeLinecap="round" strokeDashoffset={2 * Math.PI * 65 * 0.25}
+                      style={{ transition: 'stroke-dasharray 1s ease' }} />
+                  </svg>
+                  <div style={{ position: 'absolute', textAlign: 'center' }}>
+                    <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#2c3e50' }}>{backendSonuc.riskSkoru}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#999', fontWeight: 600 }}>/ 100</div>
+                  </div>
+                </div>
+                <p style={{ 
+                  fontSize: '1.3rem', fontWeight: 800, marginTop: 12,
+                  color: backendSonuc.riskSkoru < 30 ? '#27ae60' : backendSonuc.riskSkoru < 60 ? '#e67e22' : '#e74c3c'
+                }}>
+                  {backendSonuc.riskSeviyesi}
+                </p>
+                {backendSonuc.riskSkoru >= 60 && (
+                  <p style={{ fontSize: '0.95rem', color: '#666', marginTop: 8, maxWidth: 400, margin: '8px auto 0' }}>
+                    Sonuçlar dikkat gerektiriyor. Bir uzmanla görüşmenizi öneririz.
+                  </p>
+                )}
               </div>
-            </div>
-            <p style={{ fontSize: '1.3rem', fontWeight: 800, color: riskRenk, marginTop: 12 }}>{riskLabel}</p>
-            {risk >= 60 && (
-              <p style={{ fontSize: '0.95rem', color: '#666', marginTop: 8, maxWidth: 400, margin: '8px auto 0' }}>
-                Sonuçlar dikkat gerektiriyor. Bir uzmanla görüşmenizi öneririz.
-              </p>
-            )}
-          </div>
 
-          {/* Metrik kartları */}
-          <div style={s.grid2}>
-            <MetrikKart baslik="Klavye Hata Oranı" deger={`%${klavyeHataOrt}`} renk="#3498db" ikon="⌨️"
-              aciklama="Referans metne göre ortalama yazım hatası" />
-            <MetrikKart baslik="Silme (Backspace)" deger={backspaceOrt} renk="#9b59b6" ikon="⌫"
-              aciklama="Yazı başına ortalama geri silme sayısı" />
-            <MetrikKart baslik="Çizim Titremesi" deger={titremeOrt} renk="#e67e22" ikon="✏️"
-              aciklama="Harf çizimindeki yön değişimi sayısı" />
-            <MetrikKart baslik="Çizim Duraksaması" deger={duraksamaOrt} renk="#e74c3c" ikon="⏸️"
-              aciklama="Çizim sırasında 300ms+ duraksama sayısı" />
-          </div>
-
-          {/* Detaylı tablolar */}
-          <div style={s.grid2}>
-            <div style={s.kart}>
-              <h3 style={s.kartBaslik}>⌨️ Klavye Analizi</h3>
-              <table style={s.tablo}>
-                <thead>
-                  <tr>
-                    <th style={s.th}>Tip</th>
-                    <th style={s.th}>Hata %</th>
-                    <th style={s.th}>Backspace</th>
-                    <th style={s.th}>Ort. Aralık</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {klavyeSonuclar.map((r, i) => (
-                    <tr key={i} style={{ background: i % 2 === 0 ? '#f9f9f9' : 'white' }}>
-                      <td style={s.td}>{r.tip === 'yaz' ? '📖 Yazarak' : '🎧 Dinleyerek'}</td>
-                      <td style={{ ...s.td, color: r.hata > 30 ? '#e74c3c' : '#27ae60', fontWeight: 700 }}>%{r.hata}</td>
-                      <td style={s.td}>{r.backspace}</td>
-                      <td style={s.td}>{r.aralikOrt}ms</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div style={s.kart}>
-              <h3 style={s.kartBaslik}>✏️ Çizim Analizi</h3>
-              <table style={s.tablo}>
-                <thead>
-                  <tr>
-                    <th style={s.th}>Tip</th>
-                    <th style={s.th}>Hedef</th>
-                    <th style={s.th}>Titreme</th>
-                    <th style={s.th}>Duraklama</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cizimSonuclar.slice(0, 10).map((r, i) => (
-                    <tr key={i} style={{ background: i % 2 === 0 ? '#f9f9f9' : 'white' }}>
-                      <td style={s.td}>{r.tip === 'harf' ? '🔤' : r.tip === 'kelimeBas' ? '🔠' : '📝'}</td>
-                      <td style={{ ...s.td, fontWeight: 700, color: '#2c3e50' }}>{r.hedef}</td>
-                      <td style={{ ...s.td, color: r.titreme > 5 ? '#e74c3c' : '#27ae60', fontWeight: 600 }}>{r.titreme}</td>
-                      <td style={{ ...s.td, color: r.duraksamaSayisi > 2 ? '#e74c3c' : '#27ae60', fontWeight: 600 }}>{r.duraksamaSayisi}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+              {/* Metrik kartları */}
+              <div style={s.grid2}>
+                <MetrikKart baslik="Klavye Hata Oranı" deger={`%${backendSonuc.klavyeHataOrtalamasi}`} renk="#3498db" ikon="⌨️"
+                  aciklama="Referans metne göre ortalama yazım hatası" />
+                <MetrikKart baslik="Silme (Backspace)" deger={backendSonuc.backspaceOrtalamasi} renk="#9b59b6" ikon="⌫"
+                  aciklama="Yazı başına ortalama geri silme sayısı" />
+                <MetrikKart baslik="Çizim Titremesi" deger={backendSonuc.titremeOrtalamasi} renk="#e67e22" ikon="✏️"
+                  aciklama="Harf çizimindeki yön değişimi sayısı" />
+                <MetrikKart baslik="Çizim Duraksaması" deger={backendSonuc.duraksamaOrtalamasi} renk="#e74c3c" ikon="⏸️"
+                  aciklama="Çizim sırasında 300ms+ duraksama sayısı" />
+              </div>
+            </>
+          )}
 
           <div style={{ textAlign: 'center', marginTop: 40, display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button onClick={() => navigate('/rapor')} style={s.birincilBtn}>Gelişim Raporumu Gör ➔</button>
-            <button onClick={() => { setAdim('klavye'); setKlavyeAlt('yaz'); setKlavyeIndex(0); setDinleIndex(0); setKlavyeSonuclar([]); setCizimSonuclar([]); setCizimAdim(0); setCizimTekrar(0); setHedefHarf(0); setKlavyeTamamlandi(false); setCizimTamamlandi(false); }} style={s.ikinciBtn}>
+            <button onClick={() => { 
+              setAdim('klavye'); setKlavyeAlt('yaz'); setKlavyeIndex(0); setDinleIndex(0); 
+              setKlavyeHamVeriler([]); setCizimHamVeriler([]); setBackendSonuc(null);
+              setCizimAdim(0); setCizimTekrar(0); setHedefHarf(0); 
+              setKlavyeTamamlandi(false); setCizimTamamlandi(false); 
+            }} style={s.ikinciBtn}>
               Tekrar Başla
             </button>
           </div>
@@ -510,7 +440,6 @@ export default function Analiz() {
         {/* ── KLAVYE BÖLÜMÜ ── */}
         {adim === 'klavye' && (
           <div style={s.kart}>
-            {/* Alt sekme */}
             <div style={s.sekmeSarici}>
               <button style={{ ...s.sekme, ...(klavyeAlt === 'yaz' ? s.sekmeAktif : {}) }}>
                 📖 Bakarak Yazma ({Math.min(klavyeIndex + 1, KLAVYE_METINLER.length)}/{KLAVYE_METINLER.length})
@@ -563,7 +492,7 @@ export default function Analiz() {
               <div style={{ textAlign: 'center', padding: '40px 20px' }}>
                 <div style={{ fontSize: '4rem', marginBottom: 16 }}>✅</div>
                 <h3 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#2c3e50', marginBottom: 8 }}>Klavye Analizi Tamamlandı!</h3>
-                <p style={{ color: '#7f8c8d', marginBottom: 32 }}>{klavyeSonuclar.length} test kaydedildi. Şimdi çizim analizine geçebilirsiniz.</p>
+                <p style={{ color: '#7f8c8d', marginBottom: 32 }}>{klavyeHamVeriler.length} test kaydedildi. Şimdi çizim analizine geçebilirsiniz.</p>
                 <button onClick={() => setAdim('cizim')} style={s.birincilBtn}>Çizim Analizine Geç ➔</button>
               </div>
             )}
@@ -604,8 +533,10 @@ export default function Analiz() {
               <div style={{ textAlign: 'center', padding: '40px 20px' }}>
                 <div style={{ fontSize: '4rem', marginBottom: 16 }}>🎉</div>
                 <h3 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#2c3e50', marginBottom: 8 }}>Tüm Testler Tamamlandı!</h3>
-                <p style={{ color: '#7f8c8d', marginBottom: 32 }}>Sonuçlarınız hazırlanıyor...</p>
-                <button onClick={() => setAdim('sonuc')} style={s.birincilBtn}>Sonuçları Gör ➔</button>
+                <p style={{ color: '#7f8c8d', marginBottom: 32 }}>Verileriniz hazır, yapay zeka analizine gönderebilirsiniz.</p>
+                <button onClick={sonuclariGonderVeGoster} style={{...s.birincilBtn, background: 'linear-gradient(135deg, #e67e22, #f39c12)'}}>
+                  Verileri Gönder ve Sonucu Gör 🚀
+                </button>
               </div>
             )}
           </div>
