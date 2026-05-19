@@ -464,6 +464,43 @@ export default function Analiz() {
 
                     </div>
 
+                    {/* ── YENİ: YAPAY ZEKA TAHMİNLERİ BÖLÜMÜ ── */}
+                    {backendSonuc.yapayZekaTahminleri && backendSonuc.yapayZekaTahminleri.length > 0 && (
+                      <div style={{ marginTop: '60px', width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '24px', justifyContent: 'center' }}>
+                          <SparklesIcon size={28} color="#e67e22" />
+                          <h3 style={{ fontSize: '1.5rem', color: '#2c3e50', fontWeight: 800 }}>Yapay Zeka Çizim Analizi</h3>
+                        </div>
+                        
+                        {/* Yatayda kaydırılabilir (scroll) kart dizilimi */}
+                        <div style={{ display: 'flex', gap: '20px', overflowX: 'auto', padding: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                          {backendSonuc.yapayZekaTahminleri.map((tahmin, i) => (
+                            <div key={i} style={{ 
+                              flex: '0 0 200px', padding: '24px', borderRadius: '24px', 
+                              border: `2px solid ${tahmin.karisti ? '#e74c3c30' : '#27ae6030'}`,
+                              background: tahmin.karisti ? '#fff5f5' : '#f0fdf4',
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+                              boxShadow: '0 4px 15px rgba(0,0,0,0.02)'
+                            }}>
+                              <div style={{ fontSize: '0.85rem', color: '#7f8c8d', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>HEDEF: {tahmin.hedef}</div>
+                              
+                              <div style={{ fontSize: '3rem', fontWeight: 900, color: '#2c3e50', margin: '10px 0', lineHeight: 1 }}>
+                                {tahmin.tahmin}
+                              </div>
+                              
+                              <div style={{ 
+                                fontSize: '0.95rem', fontWeight: 800, color: tahmin.karisti ? '#e74c3c' : '#27ae60', 
+                                background: 'white', padding: '8px 16px', borderRadius: '99px', 
+                                boxShadow: '0 4px 15px rgba(0,0,0,0.04)' 
+                              }}>
+                                %{tahmin.guven} {tahmin.karisti ? 'Karıştırdı' : 'Emin'}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Aksiyon Butonları */}
                     <div style={{ textAlign: 'center', marginTop: 80, display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
                       <button onClick={() => navigate('/rapor')} style={{...s.birincilBtn, padding: '16px 40px', fontSize: '1.1rem'}}>Gelişim Raporumu Gör <ArrowRightIcon /></button>

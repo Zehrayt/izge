@@ -8,6 +8,8 @@ public class AnalizResponseDTO {
     private int riskSkoru;
     private String riskSeviyesi;
 
+    private java.util.List<AITahminDTO> yapayZekaTahminleri;
+
     public int getKlavyeHataOrtalamasi() { return klavyeHataOrtalamasi; }
     public void setKlavyeHataOrtalamasi(int klavyeHataOrtalamasi) { this.klavyeHataOrtalamasi = klavyeHataOrtalamasi; }
     
@@ -25,4 +27,7 @@ public class AnalizResponseDTO {
     
     public String getRiskSeviyesi() { return riskSeviyesi; }
     public void setRiskSeviyesi(String riskSeviyesi) { this.riskSeviyesi = riskSeviyesi; }
+
+    public java.util.List<AITahminDTO> getYapayZekaTahminleri() { return yapayZekaTahminleri; }
+    public void setYapayZekaTahminleri(java.util.List<AITahminDTO> yapayZekaTahminleri) { this.yapayZekaTahminleri = yapayZekaTahminleri; }
 }

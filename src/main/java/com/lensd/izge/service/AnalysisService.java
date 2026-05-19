@@ -8,8 +8,10 @@ import com.lensd.izge.repository.KeystrokeRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import com.lensd.izge.dto.AITahminDTO;
 
 import java.util.List;
+import java.util.ArrayList; // Bu import eklendi
 
 @Service
 public class AnalysisService {
@@ -20,6 +22,9 @@ public class AnalysisService {
     @Autowired
     private CanvasRepository canvasRepository;
 
+    @Autowired
+    private PythonAIService pythonAIService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -28,22 +33,39 @@ public class AnalysisService {
     public AnalizResponseDTO evaluateAnalysis(String userId, AnalizRequestDTO request) {
         AnalizResponseDTO response = new AnalizResponseDTO();
 
-        // 1. HAM VERİLERİ VERİTABANINA KAYDET!!! (İleride model eğitimi ve gelişim raporu için)
+        // 1. HAM VERİLERİ VERİTABANINA KAYDET
         saveRawDataToDatabase(userId, request);
 
         // 2. KULAK VE DİL MODÜLÜ (Klavye Metrikleri)
-        // NOT: Zemberek ve HeceTokenizer entegrasyonu ileride bu metodların içine eklenecek.
         int klavyeHataOrt = calculateAverageKeyboardError(request.getKlavyeAnalizleri());
         int backspaceOrt = calculateAverageBackspace(request.getKlavyeAnalizleri());
 
         // 3. GÖZ MODÜLÜ (Çizim Metrikleri)
-        // NOT: T-H-E Dataset ve Python CV modelinden dönen sonuçlar ileride buraya entegre edilecek.
         int titremeOrt = calculateAverageJitter(request.getCizimAnalizleri());
         int duraksamaOrt = calculateAveragePauses(request.getCizimAnalizleri());
 
-        // 4. BEYİN MODÜLÜ (Risk Skoru ve Karar Mekanizması)
-        // NOT: Akademik makalelerden elde edilen ağırlıklar ileride bu metoda eklenecek.
-        int riskSkoru = calculateRiskScore(klavyeHataOrt, backspaceOrt, titremeOrt, duraksamaOrt);
+        int cizimKaristirmaSayisi = 0;
+        List<AITahminDTO> aiTahminListesi = new ArrayList<>(); // BU SATIR EKLENDİ
+
+        if (request.getCizimAnalizleri() != null) {
+            for (CizimAnalizDTO cizim : request.getCizimAnalizleri()) {
+                AITahminDTO aiSonuc = pythonAIService.harfTahminEt(cizim);
+                if (aiSonuc != null) {
+                    aiTahminListesi.add(aiSonuc); // BU SATIR EKLENDİ
+                    if (aiSonuc.isKaristi()) {
+                        cizimKaristirmaSayisi++;
+                    }
+                }
+            }
+        }
+
+        // 4. BEYİN MODÜLÜ (Risk Skoru)
+        int riskSkoru = calculateRiskScore(
+            klavyeHataOrt, backspaceOrt, 
+            titremeOrt, duraksamaOrt, 
+            cizimKaristirmaSayisi
+        );
+
         String riskSeviyesi = determineRiskLevel(riskSkoru);
 
         // 5. SONUÇLARI DTO'YA YERLEŞTİR VE FRONTEND'E GÖNDER
@@ -53,6 +75,9 @@ public class AnalysisService {
         response.setDuraksamaOrtalamasi(duraksamaOrt);
         response.setRiskSkoru(riskSkoru);
         response.setRiskSeviyesi(riskSeviyesi);
+        
+        // AI TAHMİNLERİNİ REACT'E GÖNDER
+        response.setYapayZekaTahminleri(aiTahminListesi); // BU SATIR EKLENDİ
 
         return response;
     }
@@ -60,7 +85,6 @@ public class AnalysisService {
     // --- VERİTABANI KAYIT İŞLEMİ ---
     private void saveRawDataToDatabase(String userId, AnalizRequestDTO request) {
         try {
-            // Klavye verilerini tek tek Entity'e çevirip kaydet
             if (request.getKlavyeAnalizleri() != null) {
                 for (KlavyeAnalizDTO klavye : request.getKlavyeAnalizleri()) {
                     KeystrokeEntity kEntity = new KeystrokeEntity();
@@ -70,7 +94,6 @@ public class AnalysisService {
                 }
             }
             
-            // Çizim verilerini tek tek Entity'e çevirip kaydet
             if (request.getCizimAnalizleri() != null) {
                 for (CizimAnalizDTO cizim : request.getCizimAnalizleri()) {
                     CanvasEntity cEntity = new CanvasEntity();
@@ -85,7 +108,7 @@ public class AnalysisService {
     }
 
 
-    // MATEMATİKSEL ALGORİTMALAR
+    // --- MATEMATİKSEL ALGORİTMALAR ---
 
     private int calculateAverageKeyboardError(List<KlavyeAnalizDTO> analizler) {
         if (analizler == null || analizler.isEmpty()) return 0;
@@ -172,12 +195,15 @@ public class AnalysisService {
         return pauseCount;
     }
 
-    private int calculateRiskScore(int klvHata, int bspace, int titreme, int duraksama) {
+    private int calculateRiskScore(int klvHata, int bspace, 
+                                int titreme, int duraksama,
+                                int cizimKaristirma) {
         double score = 0;
         score += Math.min(40, klvHata * 0.8);
         score += Math.min(20, bspace * 2);
-        score += Math.min(25, titreme * 1.5);
-        score += Math.min(15, duraksama * 2);
+        score += Math.min(15, titreme * 1.5);
+        score += Math.min(10, duraksama * 2);
+        score += Math.min(15, cizimKaristirma * 3); 
         return (int) Math.round(score);
     }
 
