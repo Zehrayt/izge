@@ -7,8 +7,8 @@ from tensorflow.keras.models import load_model
 app = Flask(__name__)
 
 # Model bir kere yüklensin, her istekte tekrar yüklenmesin
-model = load_model('izge_bdpq_model.keras')
-SINIFLAR = {0: 'b', 1: 'd', 2: 'p', 3: 'q'}
+model = load_model('izge_bdpqgk_model.keras')
+SINIFLAR = {0: 'b', 1: 'd', 2: 'g', 3: 'k', 4: 'p', 5: 'q'}
 
 def koordinatlardan_goruntu(koordinatlar, boyut=28):
     """
@@ -47,31 +47,29 @@ def tahmin():
     try:
         veri = request.get_json()
         koordinatlar = veri.get('koordinatlar', [])
-        hedef        = veri.get('hedefKarakter', '')
+        hedef = veri.get('hedefKarakter', '')
 
         goruntu = koordinatlardan_goruntu(koordinatlar)
         if goruntu is None:
             return jsonify({'hata': 'Yetersiz koordinat'}), 400
 
-        # Modele hazırla: (1, 28, 28, 1), normalize
         giris = goruntu.reshape(1, 28, 28, 1).astype('float32') / 255.0
 
         tahmin_olasiliklari = model.predict(giris, verbose=0)[0]
-        tahmin_index        = int(np.argmax(tahmin_olasiliklari))
-        tahmin_harf         = SINIFLAR[tahmin_index]
-        guven               = float(tahmin_olasiliklari[tahmin_index])
+        tahmin_index = int(np.argmax(tahmin_olasiliklari))
+        tahmin_harf = SINIFLAR[tahmin_index]
+        guven = float(tahmin_olasiliklari[tahmin_index])
 
-        # Karıştırma tespiti
         karisti = (tahmin_harf != hedef) if hedef else False
 
         return jsonify({
-            'tahmin':     tahmin_harf,
-            'hedef':      hedef,
-            'guven':      round(guven * 100, 1),
-            'karisti':    karisti,
+            'tahmin': tahmin_harf,
+            'hedef': hedef,
+            'guven': round(guven * 100, 1),
+            'karisti': karisti,
             'olasiliklar': {
                 SINIFLAR[i]: round(float(tahmin_olasiliklari[i]) * 100, 1)
-                for i in range(4)
+                for i in range(6)
             }
         })
 
@@ -80,7 +78,7 @@ def tahmin():
 
 @app.route('/saglik', methods=['GET'])
 def saglik():
-    return jsonify({'durum': 'aktif', 'model': 'bdpq_v1'})
+    return jsonify({'durum': 'aktif', 'model': 'bdpqgk_v1'})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)

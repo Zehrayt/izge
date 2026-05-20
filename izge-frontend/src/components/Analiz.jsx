@@ -41,8 +41,8 @@ const DINLEME_METINLER = [
   "Denizde yüzmek harika bir duygu.",
 ];
 
-const CIZIM_HARFLER = ['b', 'd', 'p', 'q'];
-const CIZIM_KELIMELER = ['baba', 'dede', 'para', 'kalem'];
+const CIZIM_HARFLER = ['b', 'd', 'g', 'k', 'p', 'q'];
+const CIZIM_KELIMELER = ['baba', 'dede', 'gemi', 'para', 'kalem'];
 
 // ─── ANA BİLEŞEN ─────────────────────────────────────────────────────────────
 export default function Analiz() {
