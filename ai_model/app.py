@@ -7,38 +7,45 @@ from tensorflow.keras.models import load_model
 app = Flask(__name__)
 
 # Model bir kere yüklensin, her istekte tekrar yüklenmesin
-model = load_model('izge_bdpqgk_model.keras')
-SINIFLAR = {0: 'b', 1: 'd', 2: 'g', 3: 'k', 4: 'p', 5: 'q'}
+harf_modeli = load_model('izge_bdpqgk_model.keras')
 
-def koordinatlardan_goruntu(koordinatlar, boyut=28):
-    """
-    Frontend'den gelen [{x, y, time}] listesini
-    28x28 siyah-beyaz görüntüye çevirir.
-    """
+try:
+    kelime_modeli = load_model('izge_kelime_model.keras')
+    print("Kelime modeli yüklendi. Çıkış sınıfları:", kelime_modeli.output_shape)
+except Exception as e:
+    print("Kelime modeli YÜKLENEMEDİ:", e)
+    kelime_modeli = None
+
+HARF_SINIFLAR = {0: 'b', 1: 'd', 2: 'g', 3: 'k', 4: 'p', 5: 'q'}
+KELIME_SINIFLAR = {0: 'baba', 1: 'dede', 2: 'gemi', 3: 'para', 4: 'kalem'}
+
+
+def koordinatlardan_goruntu(koordinatlar, boyut_w=28, boyut_h=28):
     if not koordinatlar or len(koordinatlar) < 2:
         return None
 
-    # Koordinatları numpy dizisine al
     noktalar = np.array([[k['x'], k['y']] for k in koordinatlar], dtype=np.float32)
 
-    # Canvas boyutu 800x400, 28x28'e normalize et
     x_min, y_min = noktalar.min(axis=0)
     x_max, y_max = noktalar.max(axis=0)
 
-    # Sıfıra bölme koruması
     x_aralik = x_max - x_min if x_max != x_min else 1
     y_aralik = y_max - y_min if y_max != y_min else 1
 
-    # Normalize et, 4px kenar boşluğu bırak
-    noktalar[:, 0] = (noktalar[:, 0] - x_min) / x_aralik * 20 + 4
-    noktalar[:, 1] = (noktalar[:, 1] - y_min) / y_aralik * 20 + 4
+    # ← DÜZELTME: padding oransal olmalı, sabit 4px değil
+    pad_x = boyut_w * 0.1
+    pad_y = boyut_h * 0.1
 
-    # Siyah zemin üzerine beyaz çizgi
-    goruntu = np.zeros((boyut, boyut), dtype=np.uint8)
+    noktalar[:, 0] = (noktalar[:, 0] - x_min) / x_aralik * (boyut_w - 2 * pad_x) + pad_x
+    noktalar[:, 1] = (noktalar[:, 1] - y_min) / y_aralik * (boyut_h - 2 * pad_y) + pad_y
+
+    goruntu = np.zeros((boyut_h, boyut_w), dtype=np.uint8)
     for i in range(len(noktalar) - 1):
-        x1, y1 = int(noktalar[i][0]),   int(noktalar[i][1])
+        x1, y1 = int(noktalar[i][0]), int(noktalar[i][1])
         x2, y2 = int(noktalar[i+1][0]), int(noktalar[i+1][1])
-        cv2.line(goruntu, (x1, y1), (x2, y2), 255, thickness=2)
+        # ← DÜZELTME: thickness da oransal
+        kalinlik = max(1, boyut_w // 28)
+        cv2.line(goruntu, (x1, y1), (x2, y2), 255, thickness=kalinlik)
 
     return goruntu
 
@@ -48,29 +55,35 @@ def tahmin():
         veri = request.get_json()
         koordinatlar = veri.get('koordinatlar', [])
         hedef = veri.get('hedefKarakter', '')
+        tip = veri.get('tip', 'harf') # Frontend'den tip gelecek
 
-        goruntu = koordinatlardan_goruntu(koordinatlar)
+        if tip == 'kelime':
+            if kelime_modeli is None:
+                return jsonify({'hata': 'Kelime modeli mevcut değil'}), 500
+            model = kelime_modeli
+            siniflar = KELIME_SINIFLAR
+            input_shape = (1, 32, 128, 1)
+        else:
+            goruntu = koordinatlardan_goruntu(koordinatlar, boyut_w=28, boyut_h=28)
+            model = harf_modeli
+            siniflar = HARF_SINIFLAR
+            input_shape = (1, 28, 28, 1)
+
         if goruntu is None:
             return jsonify({'hata': 'Yetersiz koordinat'}), 400
 
-        giris = goruntu.reshape(1, 28, 28, 1).astype('float32') / 255.0
+        giris = goruntu.reshape(input_shape).astype('float32') / 255.0
 
         tahmin_olasiliklari = model.predict(giris, verbose=0)[0]
         tahmin_index = int(np.argmax(tahmin_olasiliklari))
-        tahmin_harf = SINIFLAR[tahmin_index]
+        tahmin_sonuc = siniflar[tahmin_index]
         guven = float(tahmin_olasiliklari[tahmin_index])
 
-        karisti = (tahmin_harf != hedef) if hedef else False
-
         return jsonify({
-            'tahmin': tahmin_harf,
+            'tahmin': tahmin_sonuc,
             'hedef': hedef,
             'guven': round(guven * 100, 1),
-            'karisti': karisti,
-            'olasiliklar': {
-                SINIFLAR[i]: round(float(tahmin_olasiliklari[i]) * 100, 1)
-                for i in range(6)
-            }
+            'karisti': (tahmin_sonuc != hedef) if hedef else False
         })
 
     except Exception as e:

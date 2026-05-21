@@ -102,7 +102,10 @@ export default function Analiz() {
     ctx.lineJoin = 'round';
     ctx.strokeStyle = '#3498db';
     ctx.lineWidth = 4;
-  }, [adim, cizimAdim, cizimTekrar]);
+    
+    // Her adım değişiminde alanı temizle ve boyutu oturt
+    temizleCanvas();
+  }, [adim, cizimAdim]);
 
   // ── Klavye Handlers ──
   const handleTusBasildi = (e) => {
@@ -179,27 +182,35 @@ export default function Analiz() {
   };
 
   const cizimIlerle = () => {
-    if (koordinatlar.length === 0) { alert('Lütfen önce çizim yapınız!'); return; }
-    let hedef = '', tip = '';
-    if (cizimAdim === 0) { hedef = CIZIM_HARFLER[hedefHarf]; tip = 'harf'; } 
-    else if (cizimAdim === 1) { hedef = CIZIM_KELIMELER[hedefKelimeBas][0]; tip = 'kelimeBas'; } 
-    else { hedef = CIZIM_KELIMELER[hedefKelime]; tip = 'kelime'; }
+  if (koordinatlar.length === 0) { alert('Lütfen önce çizim yapınız!'); return; }
+  
+  let hedef = '', tip = '';
+  if (cizimAdim === 0) { 
+    hedef = CIZIM_HARFLER[hedefHarf]; 
+    tip = 'harf'; 
+  } else if (cizimAdim === 1) { 
+    hedef = CIZIM_KELIMELER[hedefKelimeBas][0]; // baş harf
+    tip = 'harf'; // ← harf modeli çalışsın
+  } else { 
+    hedef = CIZIM_KELIMELER[hedefKelime]; 
+    tip = 'kelime'; // ← kelime modeli çalışsın
+  }
 
-    const yeniHamCizim = { tip, hedefKarakter: hedef, koordinatlar: [...koordinatlar] };
-    setCizimHamVeriler(prev => [...prev, yeniHamCizim]);
-    temizleCanvas();
+  const yeniHamCizim = { tip, hedefKarakter: hedef, koordinatlar: [...koordinatlar] };
+  setCizimHamVeriler(prev => [...prev, yeniHamCizim]);
+  temizleCanvas();
 
-    if (cizimAdim === 0) {
-      if (cizimTekrar < 2) setCizimTekrar(prev => prev + 1);
-      else { setCizimTekrar(0); if (hedefHarf < CIZIM_HARFLER.length - 1) setHedefHarf(prev => prev + 1); else { setCizimAdim(1); setHedefHarf(0); } }
-    } else if (cizimAdim === 1) {
-      if (cizimTekrar < 2) setCizimTekrar(prev => prev + 1);
-      else { setCizimTekrar(0); if (hedefKelimeBas < CIZIM_KELIMELER.length - 1) setHedefKelimeBas(prev => prev + 1); else { setCizimAdim(2); setHedefKelimeBas(0); } }
-    } else {
-      if (cizimTekrar < 2) setCizimTekrar(prev => prev + 1);
-      else { setCizimTekrar(0); if (hedefKelime < CIZIM_KELIMELER.length - 1) setHedefKelime(prev => prev + 1); else setCizimTamamlandi(true); }
-    }
-  };
+  if (cizimAdim === 0) {
+    if (cizimTekrar < 2) setCizimTekrar(prev => prev + 1);
+    else { setCizimTekrar(0); if (hedefHarf < CIZIM_HARFLER.length - 1) setHedefHarf(prev => prev + 1); else { setCizimAdim(1); setHedefHarf(0); } }
+  } else if (cizimAdim === 1) {
+    if (cizimTekrar < 2) setCizimTekrar(prev => prev + 1);
+    else { setCizimTekrar(0); if (hedefKelimeBas < CIZIM_KELIMELER.length - 1) setHedefKelimeBas(prev => prev + 1); else { setCizimAdim(2); setHedefKelimeBas(0); } }
+  } else {
+    if (cizimTekrar < 2) setCizimTekrar(prev => prev + 1);
+    else { setCizimTekrar(0); if (hedefKelime < CIZIM_KELIMELER.length - 1) setHedefKelime(prev => prev + 1); else setCizimTamamlandi(true); }
+  }
+};
 
   // ─── VERİLERİ BACKEND'E GÖNDERME ───
   const sonuclariGonderVeGoster = async () => {
@@ -385,7 +396,25 @@ export default function Analiz() {
                 {!cizimTamamlandi ? (
                   <>
                     <div style={s.canvasSarici}>
-                      <canvas ref={canvasRef} onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} width={800} height={400} style={s.canvas} />
+                      <canvas
+                        ref={canvasRef}
+                        onMouseDown={startDrawing}
+                        onMouseMove={draw}
+                        onMouseUp={stopDrawing}
+                        onMouseLeave={stopDrawing}
+                        onTouchStart={startDrawing}
+                        onTouchMove={draw}
+                        onTouchEnd={stopDrawing}
+                        width={cizimAdim === 0 ? 400 : 800}
+                        height={cizimAdim === 0 ? 400 : 200}
+                        style={{
+                          ...s.canvas,
+                          width: cizimAdim === 0 ? '400px' : '100%',
+                          maxWidth: cizimAdim === 0 ? '400px' : '800px',
+                          height: 'auto',
+                          aspectRatio: cizimAdim === 0 ? '1/1' : '4/1',
+                        }}
+                      />
                     </div>
                     <div style={{ display: 'flex', gap: 12, marginTop: 24, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                       <button onClick={temizleCanvas} style={s.ikinciBtn}>
@@ -605,7 +634,16 @@ const s = {
   talimat: { fontSize: '1.2rem', fontWeight: 600, color: '#2c3e50', marginBottom: 4 },
   altBilgi: { fontSize: '0.9rem', color: '#aaa', fontWeight: 500 },
   canvasSarici: { display: 'flex', justifyContent: 'center', width: '100%' },
-  canvas: { background: 'white', border: '3px dashed #3498db', borderRadius: 24, cursor: 'crosshair', touchAction: 'none', width: '100%', height: 'auto', aspectRatio: '2/1', boxShadow: '0 8px 24px rgba(52,152,219,0.08)' },
+  canvas: { 
+    background: 'white', 
+    border: '3px dashed #3498db', 
+    borderRadius: 24, 
+    cursor: 'crosshair', 
+    touchAction: 'none', 
+    width: '100%', 
+    height: 'auto', 
+    boxShadow: '0 8px 24px rgba(52,152,219,0.08)' 
+  },
   birincilBtn: { display: 'flex', alignItems: 'center', gap: '8px', padding: '16px 40px', borderRadius: 99, background: 'linear-gradient(135deg,#3498db,#6A74C9)', color: 'white', border: 'none', fontWeight: 800, fontSize: '1.05rem', cursor: 'pointer', boxShadow: '0 6px 20px rgba(52,152,219,0.3)', transition: 'transform 0.2s, box-shadow 0.2s' },
   ikinciBtn: { display: 'flex', alignItems: 'center', gap: '8px', padding: '16px 32px', borderRadius: 99, background: 'white', color: '#2c3e50', border: '2px solid #eee', fontWeight: 700, fontSize: '1.05rem', cursor: 'pointer' }
 };
