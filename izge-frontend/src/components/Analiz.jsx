@@ -101,7 +101,7 @@ export default function Analiz() {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.strokeStyle = '#3498db';
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 10;
     
     // Her adım değişiminde alanı temizle ve boyutu oturt
     temizleCanvas();
@@ -181,36 +181,56 @@ export default function Analiz() {
     setKoordinatlar([]);
   };
 
-  const cizimIlerle = () => {
-  if (koordinatlar.length === 0) { alert('Lütfen önce çizim yapınız!'); return; }
-  
-  let hedef = '', tip = '';
-  if (cizimAdim === 0) { 
-    hedef = CIZIM_HARFLER[hedefHarf]; 
-    tip = 'harf'; 
-  } else if (cizimAdim === 1) { 
-    hedef = CIZIM_KELIMELER[hedefKelimeBas][0]; // baş harf
-    tip = 'harf'; // ← harf modeli çalışsın
-  } else { 
-    hedef = CIZIM_KELIMELER[hedefKelime]; 
-    tip = 'kelime'; // ← kelime modeli çalışsın
-  }
+  const cizimIlerle = async () => {
+    if (koordinatlar.length === 0) { alert('Lütfen önce çizim yapınız!'); return; }
 
-  const yeniHamCizim = { tip, hedefKarakter: hedef, koordinatlar: [...koordinatlar] };
-  setCizimHamVeriler(prev => [...prev, yeniHamCizim]);
-  temizleCanvas();
+    try {
+      const debugRes = await fetch('http://localhost:5001/debug-son', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          koordinatlar: koordinatlar,
+          tip: cizimAdim === 2 ? 'kelime' : 'harf'
+        })
+      });
+      const d = await debugRes.json();
+      console.log('Beyaz piksel:', d.beyaz_piksel);
+      console.log('X aralığı:', d.x_aralik);
+      console.log('Y aralığı:', d.y_aralik);
+      // Görüntüyü ekranda göster
+      let img = document.getElementById('dbg');
+      if (!img) { img = document.createElement('img'); img.id = 'dbg'; img.style.cssText = 'position:fixed;top:10px;right:10px;z-index:9999;border:3px solid red;'; document.body.appendChild(img); }
+      img.src = 'data:image/png;base64,' + d.goruntu;
+    } catch(e) { console.log('Debug hata:', e); }
+      
+    let hedef = '', tip = '';
+    if (cizimAdim === 0) { 
+      hedef = CIZIM_HARFLER[hedefHarf]; 
+      tip = 'harf'; 
+    } else if (cizimAdim === 1) { 
+      hedef = CIZIM_KELIMELER[hedefKelimeBas][0]; // baş harf
+      tip = 'harf'; // ← harf modeli çalışsın
+    } else { 
+      hedef = CIZIM_KELIMELER[hedefKelime]; 
+      tip = 'kelime'; // ← kelime modeli çalışsın
+    }
 
-  if (cizimAdim === 0) {
-    if (cizimTekrar < 2) setCizimTekrar(prev => prev + 1);
-    else { setCizimTekrar(0); if (hedefHarf < CIZIM_HARFLER.length - 1) setHedefHarf(prev => prev + 1); else { setCizimAdim(1); setHedefHarf(0); } }
-  } else if (cizimAdim === 1) {
-    if (cizimTekrar < 2) setCizimTekrar(prev => prev + 1);
-    else { setCizimTekrar(0); if (hedefKelimeBas < CIZIM_KELIMELER.length - 1) setHedefKelimeBas(prev => prev + 1); else { setCizimAdim(2); setHedefKelimeBas(0); } }
-  } else {
-    if (cizimTekrar < 2) setCizimTekrar(prev => prev + 1);
-    else { setCizimTekrar(0); if (hedefKelime < CIZIM_KELIMELER.length - 1) setHedefKelime(prev => prev + 1); else setCizimTamamlandi(true); }
-  }
-};
+    const yeniHamCizim = { tip, hedefKarakter: hedef, koordinatlar: [...koordinatlar] };
+    setCizimHamVeriler(prev => [...prev, yeniHamCizim]);
+    temizleCanvas();
+
+    if (cizimAdim === 0) {
+      if (cizimTekrar < 2) setCizimTekrar(prev => prev + 1);
+      else { setCizimTekrar(0); if (hedefHarf < CIZIM_HARFLER.length - 1) setHedefHarf(prev => prev + 1); else { setCizimAdim(1); setHedefHarf(0); } }
+    } else if (cizimAdim === 1) {
+      if (cizimTekrar < 2) setCizimTekrar(prev => prev + 1);
+      else { setCizimTekrar(0); if (hedefKelimeBas < CIZIM_KELIMELER.length - 1) setHedefKelimeBas(prev => prev + 1); else { setCizimAdim(2); setHedefKelimeBas(0); } }
+    } else {
+      if (cizimTekrar < 2) setCizimTekrar(prev => prev + 1);
+      else { setCizimTekrar(0); if (hedefKelime < CIZIM_KELIMELER.length - 1) setHedefKelime(prev => prev + 1); else setCizimTamamlandi(true); }
+    }
+    
+  };
 
   // ─── VERİLERİ BACKEND'E GÖNDERME ───
   const sonuclariGonderVeGoster = async () => {
