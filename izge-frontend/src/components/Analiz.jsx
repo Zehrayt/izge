@@ -511,7 +511,7 @@ export default function Analiz() {
 
                     {/* Aksiyon Butonları */}
                     <div style={{ textAlign: 'center', marginTop: 80, display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
-                      <button onClick={() => navigate('/rapor')} style={{...s.birincilBtn, padding: '16px 40px', fontSize: '1.1rem'}}>Gelişim Raporumu Gör <ArrowRightIcon /></button>
+                      <button onClick={() => navigate('/rapor', { state: { analizVerisi: backendSonuc } })} style={{...s.birincilBtn, padding: '16px 40px', fontSize: '1.1rem'}}>Gelişim Raporumu Gör <ArrowRightIcon /></button>
                       <button onClick={() => { setAdim('klavye'); setKlavyeHamVeriler([]); setCizimHamVeriler([]); setBackendSonuc(null); setCizimAdim(0); setCizimTekrar(0); setHedefHarf(0); setKlavyeTamamlandi(false); setCizimTamamlandi(false); }} style={{...s.ikinciBtn, padding: '16px 40px', fontSize: '1.1rem'}}>Tekrar Başla</button>
                     </div>
                   </div>
