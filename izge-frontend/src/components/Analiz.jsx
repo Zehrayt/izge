@@ -25,22 +25,6 @@ const PenIcon = ({size=24, color="currentColor"}) => <svg width={size} height={s
 const PauseIcon = ({size=24, color="currentColor"}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>;
 
 // ─── SABITLER ────────────────────────────────────────────────────────────────
-const KLAVYE_METINLER = [
-  "Bugün gökyüzü çok bulutlu ve hava serin.",
-  "Kedi bahçede oynarken çiçekleri devirdi.",
-  "Okula giderken yolda bir köpek gördüm.",
-  "Annem bana sarı bir bisiklet aldı.",
-  "Kitaplar bilginin kapısını açar.",
-];
-
-const DINLEME_METINLER = [
-  "Sabahleyin erken kalkmak çok zordur.",
-  "Bahçedeki elmalar olgunlaştı.",
-  "Yağmur yağınca gökkuşağı çıktı.",
-  "Kardeşim resim yapmayı çok sever.",
-  "Denizde yüzmek harika bir duygu.",
-];
-
 const CIZIM_HARFLER = ['b', 'd', 'g', 'k', 'p', 'q'];
 const CIZIM_KELIMELER = ['baba', 'dede', 'gemi', 'para', 'kalem'];
 
@@ -52,12 +36,8 @@ export default function Analiz() {
   const [adim, setAdim] = useState('klavye');
 
   // ── Klavye analizi state'leri ──
-  const [klavyeAlt, setKlavyeAlt] = useState('yaz'); 
-  const [klavyeIndex, setKlavyeIndex] = useState(0);
-  const [dinleIndex, setDinleIndex] = useState(0);
   const [yazılanMetin, setYazılanMetin] = useState('');
   const [klavyeHamVeriler, setKlavyeHamVeriler] = useState([]); 
-  const [sesOynuyor, setSesOynuyor] = useState(false);
   const [klavyeTamamlandi, setKlavyeTamamlandi] = useState(false);
 
   const tusZamanlari = useRef([]);
@@ -75,6 +55,9 @@ export default function Analiz() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [cizimTamamlandi, setCizimTamamlandi] = useState(false);
   const canvasRef = useRef(null);
+  
+  // ── Ses State'i (Çizim aşaması için gerekli) ──
+  const [sesOynuyor, setSesOynuyor] = useState(false);
 
   // ── Backend Sonuç State'i ──
   const [backendSonuc, setBackendSonuc] = useState(null);
@@ -118,27 +101,20 @@ export default function Analiz() {
   };
 
   const klavyeIlerle = () => {
-    const referans = klavyeAlt === 'yaz' ? KLAVYE_METINLER[klavyeIndex] : DINLEME_METINLER[dinleIndex];
     const hamVeri = {
-      tip: klavyeAlt,
-      referansMetin: referans,
+      tip: 'serbest',
+      referansMetin: null,
       yazilanMetin: yazılanMetin,
       tusAraliklari: [...tusZamanlari.current],
       silmeSayisi: backspaceSayisi.current
     };
-    setKlavyeHamVeriler(prev => [...prev, hamVeri]);
+    
+    setKlavyeHamVeriler([hamVeri]);
     setYazılanMetin('');
     tusZamanlari.current = [];
     sonTusZamani.current = null;
     backspaceSayisi.current = 0;
-
-    if (klavyeAlt === 'yaz') {
-      if (klavyeIndex < KLAVYE_METINLER.length - 1) setKlavyeIndex(prev => prev + 1);
-      else { setKlavyeAlt('dinle'); setKlavyeIndex(0); }
-    } else {
-      if (dinleIndex < DINLEME_METINLER.length - 1) setDinleIndex(prev => prev + 1);
-      else setKlavyeTamamlandi(true);
-    }
+    setKlavyeTamamlandi(true);
   };
 
   // ── Çizim Handlers ──
@@ -229,7 +205,6 @@ export default function Analiz() {
       if (cizimTekrar < 2) setCizimTekrar(prev => prev + 1);
       else { setCizimTekrar(0); if (hedefKelime < CIZIM_KELIMELER.length - 1) setHedefKelime(prev => prev + 1); else setCizimTamamlandi(true); }
     }
-    
   };
 
   // ─── VERİLERİ BACKEND'E GÖNDERME ───
@@ -290,7 +265,7 @@ export default function Analiz() {
   };
 
   const ilerlemeYuzdesi = () => {
-    if (adim === 'klavye') return Math.round((klavyeHamVeriler.length / (KLAVYE_METINLER.length + DINLEME_METINLER.length)) * 50);
+    if (adim === 'klavye') return klavyeTamamlandi ? 50 : 0;
     if (adim === 'cizim') {
       const toplam = CIZIM_HARFLER.length * 3 + CIZIM_KELIMELER.length * 3 + CIZIM_KELIMELER.length * 3;
       return 50 + Math.round((cizimHamVeriler.length / toplam) * 50);
@@ -358,32 +333,16 @@ export default function Analiz() {
             {/* ── KLAVYE BÖLÜMÜ ── */}
             {adim === 'klavye' && (
               <div style={s.kart}>
-                <div style={s.sekmeSarici}>
-                  <button style={{ ...s.sekme, ...(klavyeAlt === 'yaz' ? s.sekmeAktif : {}) }}>
-                    <BookIcon /> Bakarak Yazma ({Math.min(klavyeIndex + 1, KLAVYE_METINLER.length)}/{KLAVYE_METINLER.length})
-                  </button>
-                  <button style={{ ...s.sekme, ...(klavyeAlt === 'dinle' ? s.sekmeAktif : {}) }}>
-                    <HeadphonesIcon /> Dinleyerek Yazma ({Math.min(dinleIndex + 1, DINLEME_METINLER.length)}/{DINLEME_METINLER.length})
-                  </button>
-                </div>
 
                 {!klavyeTamamlandi ? (
                   <>
-                    {klavyeAlt === 'yaz' ? (
-                      <div style={s.referansKutu}>
-                        <p style={{ fontSize: '0.8rem', color: '#7f8c8d', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Referans Metin</p>
-                        <p style={{ fontSize: '1.35rem', color: '#2c3e50', fontWeight: 600, lineHeight: 1.6 }}>{KLAVYE_METINLER[klavyeIndex]}</p>
-                      </div>
-                    ) : (
-                      <div style={{ ...s.referansKutu, borderLeftColor: '#6A74C9', background: 'linear-gradient(135deg, #f8f4ff, #fff)' }}>
-                        <p style={{ fontSize: '0.8rem', color: '#7f8c8d', marginBottom: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Sesli Metin</p>
-                        <button onClick={() => sesliOku(DINLEME_METINLER[dinleIndex])} style={s.sesBtn}>
-                          {sesOynuyor ? <VolumeIcon/> : <MuteIcon/>} {sesOynuyor ? 'Oynuyor...' : 'Metni Dinle'}
-                        </button>
-                        <p style={{ fontSize: '0.85rem', color: '#999', marginTop: 10 }}>Duyduğunuz metni aşağıya yazınız. Metni tekrar göremezsiniz.</p>
-                      </div>
-                    )}
+                    <div style={{ marginBottom: 24 }}>
+                        <h3 style={{ fontSize: '1.4rem', color: '#2c3e50', marginBottom: 8, fontWeight: 700 }}>Bir cümle giriniz.</h3>
+                        <p style={{ fontSize: '0.95rem', color: '#7f8c8d' }}>Lütfen aşağıdaki alana istediğiniz bir cümleyi serbestçe yazınız.</p>
+                    </div>
+                    
                     <textarea placeholder="Buraya yazınız..." value={yazılanMetin} onChange={(e) => setYazılanMetin(e.target.value)} onKeyDown={handleTusBasildi} style={s.textArea} autoFocus />
+                    
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                       <p style={{ fontSize: '0.85rem', color: '#aaa', fontWeight: 500 }}>⏱ Yazım hızı ve ritminiz ölçülüyor</p>
                       <button onClick={klavyeIlerle} disabled={yazılanMetin.trim().length === 0} style={{ ...s.birincilBtn, opacity: yazılanMetin.trim().length === 0 ? 0.4 : 1 }}>
@@ -397,7 +356,7 @@ export default function Analiz() {
                       <CheckCircleIcon size={80} color="#27ae60" />
                     </div>
                     <h3 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#2c3e50', marginBottom: 8 }}>Klavye Analizi Tamamlandı!</h3>
-                    <p style={{ color: '#7f8c8d', marginBottom: 32, fontSize: '1.1rem' }}>{klavyeHamVeriler.length} test kaydedildi. Şimdi çizim analizine geçebilirsiniz.</p>
+                    <p style={{ color: '#7f8c8d', marginBottom: 32, fontSize: '1.1rem' }}>Yazım veriniz kaydedildi. Şimdi çizim analizine geçebilirsiniz.</p>
                     <button onClick={() => setAdim('cizim')} style={s.birincilBtn}>Çizim Analizine Geç <ArrowRightIcon /></button>
                   </div>
                 )}
@@ -553,7 +512,7 @@ export default function Analiz() {
                     {/* Aksiyon Butonları */}
                     <div style={{ textAlign: 'center', marginTop: 80, display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
                       <button onClick={() => navigate('/rapor')} style={{...s.birincilBtn, padding: '16px 40px', fontSize: '1.1rem'}}>Gelişim Raporumu Gör <ArrowRightIcon /></button>
-                      <button onClick={() => { setAdim('klavye'); setKlavyeAlt('yaz'); setKlavyeIndex(0); setDinleIndex(0); setKlavyeHamVeriler([]); setCizimHamVeriler([]); setBackendSonuc(null); setCizimAdim(0); setCizimTekrar(0); setHedefHarf(0); setKlavyeTamamlandi(false); setCizimTamamlandi(false); }} style={{...s.ikinciBtn, padding: '16px 40px', fontSize: '1.1rem'}}>Tekrar Başla</button>
+                      <button onClick={() => { setAdim('klavye'); setKlavyeHamVeriler([]); setCizimHamVeriler([]); setBackendSonuc(null); setCizimAdim(0); setCizimTekrar(0); setHedefHarf(0); setKlavyeTamamlandi(false); setCizimTamamlandi(false); }} style={{...s.ikinciBtn, padding: '16px 40px', fontSize: '1.1rem'}}>Tekrar Başla</button>
                     </div>
                   </div>
                 )}
