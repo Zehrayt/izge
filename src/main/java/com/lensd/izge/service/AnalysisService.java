@@ -158,7 +158,7 @@ public class AnalysisService {
         if (analizler == null || analizler.isEmpty()) return 0;
         double totalError = 0;
         for (KlavyeAnalizDTO a : analizler) {
-            totalError += calculateHataYuzdesi(a.getReferansMetin(), a.getYazilanMetin());
+            totalError += a.getDisleksiSkoru(); 
         }
         return (int) Math.round(totalError / analizler.size());
     }
@@ -243,12 +243,16 @@ public class AnalysisService {
                                 int titreme, int duraksama,
                                 int cizimKaristirma) {
         double score = 0;
-        score += Math.min(40, klvHata * 0.8);
-        score += Math.min(20, bspace * 2);
-        score += Math.min(15, titreme * 1.5);
-        score += Math.min(10, duraksama * 2);
-        score += Math.min(15, cizimKaristirma * 5); 
-        return (int) Math.round(score);
+        
+        // Toplam riskin %35'ini Yazım Analizi, %65'ini Çizim + Motor Beceri oluştursun:
+        score += Math.min(35, klvHata * 0.35);       // Yazım Analizi (Max 35 Puan)
+        score += Math.min(10, bspace * 2);           // Silme Sayısı (Max 10 Puan)
+        score += Math.min(15, titreme * 1.5);        // Titreme (Max 15 Puan)
+        score += Math.min(10, duraksama * 2);        // Duraksama (Max 10 Puan)
+        score += Math.min(30, cizimKaristirma * 5);  // Çizim Hataları (Max 30 Puan)
+        
+        // Matematiksel güvenlik (Eğer 100'ü geçerse 100'e sabitle)
+        return Math.min(100, (int) Math.round(score)); 
     }
 
     private String determineRiskLevel(int score) {

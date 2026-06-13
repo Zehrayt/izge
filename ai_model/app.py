@@ -56,8 +56,6 @@ class CharCNNDeep(nn.Module):
         x = self.fc2(x)
         return self.sigmoid(x).squeeze(-1)
 
-app = Flask(__name__)
-
 # ── Model yükleme ──────────────────────────────────────────────────────────────
 harf_modeli = load_model('izge_bdpqgk_model.keras')
 print("✅ Harf modeli yüklendi:", harf_modeli.output_shape)

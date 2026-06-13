@@ -104,18 +104,11 @@ export default function Analiz() {
 
   const klavyeIlerle = async () => {
     setKlavyeYukleniyor(true); // Yükleme animasyonunu başlat
-    
-    const hamVeri = {
-      tip: 'serbest',
-      referansMetin: null,
-      yazilanMetin: yazılanMetin,
-      tusAraliklari: [...tusZamanlari.current],
-      silmeSayisi: backspaceSayisi.current
-    };
-    setKlavyeHamVeriler([hamVeri]);
+
+    let pyDisleksiSkoru = 0; // Skoru tutacağımız geçici değişken
 
     try {
-      // Python Flask AI Modelinden (5001 portu) tahmin al
+      // Python Flask AI Modelinden tahmin al
       const res = await fetch('http://localhost:5001/tahmin-metin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -124,11 +117,23 @@ export default function Analiz() {
       const data = await res.json();
       
       if (!data.hata) {
-        setKlavyeSonuc(data); // Sonucu state'e kaydet
+        setKlavyeSonuc(data); // Sonucu arayüz state'ine kaydet
+        // Gelen %75.5 gibi verinin "%" işaretini atıp sadece rakamı alıyoruz
+        pyDisleksiSkoru = parseFloat(data.disleksi_yuzdesi.replace('%', ''));
       }
     } catch(err) {
       console.error("Metin analizi hatası:", err);
     }
+    
+    const hamVeri = {
+      tip: 'serbest',
+      referansMetin: null,
+      yazilanMetin: yazılanMetin,
+      tusAraliklari: [...tusZamanlari.current],
+      silmeSayisi: backspaceSayisi.current,
+      disleksiSkoru: pyDisleksiSkoru
+    };
+    setKlavyeHamVeriler([hamVeri]);
 
     setYazılanMetin('');
     tusZamanlari.current = [];
@@ -181,25 +186,6 @@ export default function Analiz() {
   const cizimIlerle = async () => {
     if (koordinatlar.length === 0) { alert('Lütfen önce çizim yapınız!'); return; }
 
-    try {
-      const debugRes = await fetch('http://localhost:5001/debug-son', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          koordinatlar: koordinatlar,
-          tip: cizimAdim === 2 ? 'kelime' : 'harf'
-        })
-      });
-      const d = await debugRes.json();
-      console.log('Beyaz piksel:', d.beyaz_piksel);
-      console.log('X aralığı:', d.x_aralik);
-      console.log('Y aralığı:', d.y_aralik);
-      // Görüntüyü ekranda göster
-      let img = document.getElementById('dbg');
-      if (!img) { img = document.createElement('img'); img.id = 'dbg'; img.style.cssText = 'position:fixed;top:10px;right:10px;z-index:9999;border:3px solid red;'; document.body.appendChild(img); }
-      img.src = 'data:image/png;base64,' + d.goruntu;
-    } catch(e) { console.log('Debug hata:', e); }
-      
     let hedef = '', tip = '';
     if (cizimAdim === 0) { 
       hedef = CIZIM_HARFLER[hedefHarf]; 
@@ -571,7 +557,7 @@ export default function Analiz() {
 
                     {/* ── YAPAY ZEKA TAHMİNLERİ BÖLÜMÜ ── */}
                     {backendSonuc.yapayZekaTahminleri && backendSonuc.yapayZekaTahminleri.length > 0 && (
-                      <div style={{ marginTop: '60px', width: '100%' }}>
+                      <div style={{ marginTop: '20px', width: '100%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '24px', justifyContent: 'center' }}>
                           <SparklesIcon size={28} color="#e67e22" />
                           <h3 style={{ fontSize: '1.5rem', color: '#2c3e50', fontWeight: 800 }}>Yapay Zeka Çizim Analizi</h3>

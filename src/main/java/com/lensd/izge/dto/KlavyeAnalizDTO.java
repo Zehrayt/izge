@@ -8,6 +8,7 @@ public class KlavyeAnalizDTO {
     private String yazilanMetin;
     private List<Long> tusAraliklari;
     private int silmeSayisi;
+    private double disleksiSkoru;
 
     public String getTip() { return tip; }
     public void setTip(String tip) { this.tip = tip; }
@@ -23,4 +24,7 @@ public class KlavyeAnalizDTO {
     
     public int getSilmeSayisi() { return silmeSayisi; }
     public void setSilmeSayisi(int silmeSayisi) { this.silmeSayisi = silmeSayisi; }
+
+    public double getDisleksiSkoru() { return disleksiSkoru; }
+    public void setDisleksiSkoru(double disleksiSkoru) { this.disleksiSkoru = disleksiSkoru; }
 }
