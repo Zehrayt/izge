@@ -1,4 +1,7 @@
 from flask import Flask, request, jsonify
+
+from flask_cors import CORS
+
 import numpy as np
 import cv2
 import base64
@@ -9,7 +12,11 @@ import torch
 import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 import torch.nn as nn
-# ── PyTorch Metin Modeli İskeleti (SENİN ptMODELİN) ──
+
+app = Flask(__name__)
+CORS(app)
+
+# ── PyTorch Metin Modeli İskeleti ──
 alphabet = " abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{}ğüşıöç"
 char2int = {char: i + 1 for i, char in enumerate(alphabet)}
 vocab_size = len(alphabet) + 1
@@ -160,7 +167,7 @@ def tahmin():
     except Exception as e:
         return jsonify({'hata': str(e)}), 500
     
-    # ── /tahmin-metin (SENİN RÖTAN) ──
+    # ── /tahmin-metin  ──
 @app.route('/tahmin-metin', methods=['POST'])
 def tahmin_metin():
     if metin_modeli is None: 

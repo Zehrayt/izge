@@ -1,17 +1,31 @@
-package com.lensd.izge.dto;
+package com.lensd.izge.entity;
 
-public class AnalizResponseDTO {
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "test_oturum_gecmisi")
+public class TestOturumEntity {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String userId;
     private int klavyeHataOrtalamasi;
     private int backspaceOrtalamasi;
     private int titremeOrtalamasi;
     private int duraksamaOrtalamasi;
     private int riskSkoru;
     private String riskSeviyesi;
-    private Long id;
-    private String tarih;
-    private String saat;
 
-    private java.util.List<AITahminDTO> yapayZekaTahminleri;
+    private LocalDateTime olusturulmaTarihi = LocalDateTime.now();
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getUserId() { return userId; }
+    public void setUserId(String userId) { this.userId = userId; }
 
     public int getKlavyeHataOrtalamasi() { return klavyeHataOrtalamasi; }
     public void setKlavyeHataOrtalamasi(int klavyeHataOrtalamasi) { this.klavyeHataOrtalamasi = klavyeHataOrtalamasi; }
@@ -24,22 +38,13 @@ public class AnalizResponseDTO {
     
     public int getDuraksamaOrtalamasi() { return duraksamaOrtalamasi; }
     public void setDuraksamaOrtalamasi(int duraksamaOrtalamasi) { this.duraksamaOrtalamasi = duraksamaOrtalamasi; }
-   
+    
     public int getRiskSkoru() { return riskSkoru; }
     public void setRiskSkoru(int riskSkoru) { this.riskSkoru = riskSkoru; }
     
     public String getRiskSeviyesi() { return riskSeviyesi; }
     public void setRiskSeviyesi(String riskSeviyesi) { this.riskSeviyesi = riskSeviyesi; }
-
-    public java.util.List<AITahminDTO> getYapayZekaTahminleri() { return yapayZekaTahminleri; }
-    public void setYapayZekaTahminleri(java.util.List<AITahminDTO> yapayZekaTahminleri) { this.yapayZekaTahminleri = yapayZekaTahminleri; }
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
-    public String getTarih() { return tarih; }
-    public void setTarih(String tarih) { this.tarih = tarih; }
-
-    public String getSaat() { return saat; }
-    public void setSaat(String saat) { this.saat = saat; }
+    
+    public LocalDateTime getOlusturulmaTarihi() { return olusturulmaTarihi; }
+    public void setOlusturulmaTarihi(LocalDateTime olusturulmaTarihi) { this.olusturulmaTarihi = olusturulmaTarihi; }
 }

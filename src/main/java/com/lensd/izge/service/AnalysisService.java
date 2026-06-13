@@ -3,14 +3,18 @@ package com.lensd.izge.service;
 import com.lensd.izge.dto.*;
 import com.lensd.izge.entity.CanvasEntity;
 import com.lensd.izge.entity.KeystrokeEntity;
+import com.lensd.izge.entity.TestOturumEntity;
 import com.lensd.izge.repository.CanvasRepository;
 import com.lensd.izge.repository.KeystrokeRepository;
+import com.lensd.izge.repository.TestOturumRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import com.lensd.izge.dto.AITahminDTO;
 
 import java.util.List;
+import java.util.Locale;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList; // Bu import eklendi
 
 @Service
@@ -23,13 +27,15 @@ public class AnalysisService {
     private CanvasRepository canvasRepository;
 
     @Autowired
+    private TestOturumRepository testOturumRepository;
+
+    @Autowired
     private PythonAIService pythonAIService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /**
-     * Tüm analiz verilerini değerlendirir, veritabanına kaydeder ve nihai sonucu döner.
-     */
+    
+    //Tüm analiz verilerini değerlendirir, veritabanına kaydeder ve nihai sonucu döner.
     public AnalizResponseDTO evaluateAnalysis(String userId, AnalizRequestDTO request) {
         AnalizResponseDTO response = new AnalizResponseDTO();
 
@@ -45,13 +51,13 @@ public class AnalysisService {
         int duraksamaOrt = calculateAveragePauses(request.getCizimAnalizleri());
 
         int cizimKaristirmaSayisi = 0;
-        List<AITahminDTO> aiTahminListesi = new ArrayList<>(); // BU SATIR EKLENDİ
+        List<AITahminDTO> aiTahminListesi = new ArrayList<>();
 
         if (request.getCizimAnalizleri() != null) {
             for (CizimAnalizDTO cizim : request.getCizimAnalizleri()) {
                 AITahminDTO aiSonuc = pythonAIService.harfTahminEt(cizim);
                 if (aiSonuc != null) {
-                    aiTahminListesi.add(aiSonuc); // BU SATIR EKLENDİ
+                    aiTahminListesi.add(aiSonuc);
                     if (aiSonuc.isKaristi()) {
                         cizimKaristirmaSayisi++;
                     }
@@ -60,29 +66,42 @@ public class AnalysisService {
         }
 
         // 4. BEYİN MODÜLÜ (Risk Skoru)
-        int riskSkoru = calculateRiskScore(
-            klavyeHataOrt, backspaceOrt, 
-            titremeOrt, duraksamaOrt, 
-            cizimKaristirmaSayisi
-        );
-
+        int riskSkoru = calculateRiskScore(klavyeHataOrt, backspaceOrt, titremeOrt, duraksamaOrt, cizimKaristirmaSayisi);
         String riskSeviyesi = determineRiskLevel(riskSkoru);
 
-        // 5. SONUÇLARI DTO'YA YERLEŞTİR VE FRONTEND'E GÖNDER
+        // TEST SONUCUNU MYSQL'E KAYDET
+        TestOturumEntity oturum = new TestOturumEntity();
+        oturum.setUserId(userId != null ? userId : "anonim_kullanici");
+        oturum.setKlavyeHataOrtalamasi(klavyeHataOrt);
+        oturum.setBackspaceOrtalamasi(backspaceOrt);
+        oturum.setTitremeOrtalamasi(titremeOrt);
+        oturum.setDuraksamaOrtalamasi(duraksamaOrt);
+        oturum.setRiskSkoru(riskSkoru);
+        oturum.setRiskSeviyesi(riskSeviyesi);
+        oturum.setOlusturulmaTarihi(LocalDateTime.now());
+        
+        TestOturumEntity savedOturum = testOturumRepository.save(oturum);
+
+        // 5. SONUÇLARI DTO'YA YERLEŞTİR
+        response.setId(savedOturum.getId());
         response.setKlavyeHataOrtalamasi(klavyeHataOrt);
         response.setBackspaceOrtalamasi(backspaceOrt);
         response.setTitremeOrtalamasi(titremeOrt);
         response.setDuraksamaOrtalamasi(duraksamaOrt);
         response.setRiskSkoru(riskSkoru);
         response.setRiskSeviyesi(riskSeviyesi);
-        
-        // AI TAHMİNLERİNİ REACT'E GÖNDER
-        response.setYapayZekaTahminleri(aiTahminListesi); // BU SATIR EKLENDİ
+        response.setYapayZekaTahminleri(aiTahminListesi);
+
+        // Tarih ve saat formatla
+        DateTimeFormatter tarihFormat = DateTimeFormatter.ofPattern("dd MMMM yyyy", new Locale("tr"));
+        DateTimeFormatter saatFormat = DateTimeFormatter.ofPattern("HH:mm");
+        response.setTarih(savedOturum.getOlusturulmaTarihi().format(tarihFormat));
+        response.setSaat(savedOturum.getOlusturulmaTarihi().format(saatFormat));
 
         return response;
     }
 
-    // --- VERİTABANI KAYIT İŞLEMİ ---
+    // VERİTABANI KAYIT İŞLEMİ
     private void saveRawDataToDatabase(String userId, AnalizRequestDTO request) {
         try {
             if (request.getKlavyeAnalizleri() != null) {
@@ -107,8 +126,33 @@ public class AnalysisService {
         }
     }
 
+    // GEÇMİŞİ GETİR
+    public List<AnalizResponseDTO> kullaniciGecmisiniGetir() {
+        List<TestOturumEntity> gecmisListesi = testOturumRepository.findAllByOrderByOlusturulmaTarihiDesc();
+        List<AnalizResponseDTO> dtoList = new ArrayList<>();
 
-    // --- MATEMATİKSEL ALGORİTMALAR ---
+        DateTimeFormatter tarihFormat = DateTimeFormatter.ofPattern("dd MMMM yyyy", new Locale("tr"));
+        DateTimeFormatter saatFormat = DateTimeFormatter.ofPattern("HH:mm");
+
+        for (TestOturumEntity oturum : gecmisListesi) {
+            AnalizResponseDTO dto = new AnalizResponseDTO();
+            dto.setId(oturum.getId());
+            dto.setKlavyeHataOrtalamasi(oturum.getKlavyeHataOrtalamasi());
+            dto.setBackspaceOrtalamasi(oturum.getBackspaceOrtalamasi());
+            dto.setTitremeOrtalamasi(oturum.getTitremeOrtalamasi());
+            dto.setDuraksamaOrtalamasi(oturum.getDuraksamaOrtalamasi());
+            dto.setRiskSkoru(oturum.getRiskSkoru());
+            dto.setRiskSeviyesi(oturum.getRiskSeviyesi());
+
+            dto.setTarih(oturum.getOlusturulmaTarihi().format(tarihFormat));
+            dto.setSaat(oturum.getOlusturulmaTarihi().format(saatFormat));
+
+            dtoList.add(dto);
+        }
+        return dtoList;
+    }
+
+    // MATEMATİKSEL ALGORİTMALAR
 
     private int calculateAverageKeyboardError(List<KlavyeAnalizDTO> analizler) {
         if (analizler == null || analizler.isEmpty()) return 0;
@@ -203,7 +247,7 @@ public class AnalysisService {
         score += Math.min(20, bspace * 2);
         score += Math.min(15, titreme * 1.5);
         score += Math.min(10, duraksama * 2);
-        score += Math.min(15, cizimKaristirma * 3); 
+        score += Math.min(15, cizimKaristirma * 5); 
         return (int) Math.round(score);
     }
 

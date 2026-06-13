@@ -6,6 +6,7 @@ import com.lensd.izge.service.AnalysisService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/analiz")
@@ -31,5 +32,13 @@ public class AnalysisController {
             System.err.println("Analiz sırasında hata: " + e.getMessage());
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    @GetMapping("/gecmis")
+    public ResponseEntity<List<AnalizResponseDTO>> getGecmisAnalizler() {
+        // Servis katmanından kullanıcının tüm geçmiş testlerini liste olarak iste
+        List<AnalizResponseDTO> gecmisTestler = analysisService.kullaniciGecmisiniGetir();
+        
+        return ResponseEntity.ok(gecmisTestler);
     }
 }

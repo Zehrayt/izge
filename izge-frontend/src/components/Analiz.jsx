@@ -39,6 +39,8 @@ export default function Analiz() {
   const [yazılanMetin, setYazılanMetin] = useState('');
   const [klavyeHamVeriler, setKlavyeHamVeriler] = useState([]); 
   const [klavyeTamamlandi, setKlavyeTamamlandi] = useState(false);
+  const [klavyeSonuc, setKlavyeSonuc] = useState(null); // model Sonucunu tutacak
+  const [klavyeYukleniyor, setKlavyeYukleniyor] = useState(false); // Yükleniyor animasyonu için
 
   const tusZamanlari = useRef([]);
   const sonTusZamani = useRef(null);
@@ -100,7 +102,9 @@ export default function Analiz() {
     sonTusZamani.current = simdi;
   };
 
-  const klavyeIlerle = () => {
+  const klavyeIlerle = async () => {
+    setKlavyeYukleniyor(true); // Yükleme animasyonunu başlat
+    
     const hamVeri = {
       tip: 'serbest',
       referansMetin: null,
@@ -108,13 +112,30 @@ export default function Analiz() {
       tusAraliklari: [...tusZamanlari.current],
       silmeSayisi: backspaceSayisi.current
     };
-    
     setKlavyeHamVeriler([hamVeri]);
+
+    try {
+      // Python Flask AI Modelinden (5001 portu) tahmin al
+      const res = await fetch('http://localhost:5001/tahmin-metin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ metin: yazılanMetin })
+      });
+      const data = await res.json();
+      
+      if (!data.hata) {
+        setKlavyeSonuc(data); // Sonucu state'e kaydet
+      }
+    } catch(err) {
+      console.error("Metin analizi hatası:", err);
+    }
+
     setYazılanMetin('');
     tusZamanlari.current = [];
     sonTusZamani.current = null;
     backspaceSayisi.current = 0;
     setKlavyeTamamlandi(true);
+    setKlavyeYukleniyor(false); // Yüklemeyi bitir
   };
 
   // ── Çizim Handlers ──
@@ -351,13 +372,54 @@ export default function Analiz() {
                     </div>
                   </>
                 ) : (
-                  <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-                    <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'center' }}>
-                      <CheckCircleIcon size={80} color="#27ae60" />
-                    </div>
-                    <h3 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#2c3e50', marginBottom: 8 }}>Klavye Analizi Tamamlandı!</h3>
-                    <p style={{ color: '#7f8c8d', marginBottom: 32, fontSize: '1.1rem' }}>Yazım veriniz kaydedildi. Şimdi çizim analizine geçebilirsiniz.</p>
-                    <button onClick={() => setAdim('cizim')} style={s.birincilBtn}>Çizim Analizine Geç <ArrowRightIcon /></button>
+                  <div style={{ textAlign: 'center', padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    
+                    {klavyeYukleniyor ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                        <SpinnerIcon size={60} color="#3498db" />
+                        <h3 style={{ color: '#2c3e50' }}>Yazdıklarınız yapay zeka tarafından analiz ediliyor...</h3>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'center' }}>
+                          <CheckCircleIcon size={64} color="#27ae60" />
+                        </div>
+                        <h3 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#2c3e50', marginBottom: 8 }}>Klavye Analizi Tamamlandı!</h3>
+                        <p style={{ color: '#7f8c8d', marginBottom: 24, fontSize: '1.1rem' }}>Yazım veriniz yapay zeka tarafından incelendi.</p>
+                        
+                        {/* AI SONUÇ KARTI EKLENTİSİ */}
+                        {klavyeSonuc && (
+                          <div style={{ 
+                            display: 'flex', justifyContent: 'space-around', backgroundColor: '#f8fafc', 
+                            padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0', 
+                            width: '100%', maxWidth: '600px', marginBottom: '32px', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' 
+                          }}>
+                            <div style={{ textAlign: 'center', flex: 1 }}>
+                              <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', letterSpacing: '1px' }}>DİSLEKSİ İHTİMALİ</div>
+                              <div style={{ fontSize: '3rem', fontWeight: 900, color: '#3b82f6', lineHeight: 1 }}>{klavyeSonuc.disleksi_yuzdesi}</div>
+                            </div>
+                            
+                            <div style={{ width: '2px', backgroundColor: '#e2e8f0', margin: '0 15px' }}></div>
+                            
+                            <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                              <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 700, marginBottom: '12px', letterSpacing: '1px' }}>RİSK SEVİYESİ</div>
+                              <div style={{ 
+                                fontSize: '1.3rem', fontWeight: 800, 
+                                color: klavyeSonuc.is_disleksi ? '#ef4444' : '#10b981',
+                                backgroundColor: klavyeSonuc.is_disleksi ? '#fee2e2' : '#d1fae5',
+                                padding: '10px 24px', borderRadius: '99px', display: 'inline-block'
+                              }}>
+                                {/* Emojileri temizleyip sadece yazıyı bırakıyoruz */}
+                                {klavyeSonuc.karar.replace('🔴 ', '').replace('🟢 ', '')}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <button onClick={() => setAdim('cizim')} style={{ ...s.birincilBtn, margin: '0 auto' }}>Çizim Analizine Geç <ArrowRightIcon /></button>
+                      </>
+                    )}
+
                   </div>
                 )}
               </div>
@@ -472,7 +534,42 @@ export default function Analiz() {
 
                     </div>
 
-                    {/* ── YENİ: YAPAY ZEKA TAHMİNLERİ BÖLÜMÜ ── */}
+                    {/* ── YAPAY ZEKA YAZIM ANALİZİ (KLAVYE/PYTORCH) ── */}
+                    {klavyeSonuc && (
+                      <div style={{ marginTop: '40px', width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '24px', justifyContent: 'center' }}>
+                          <SparklesIcon size={28} color="#3498db" />
+                          <h3 style={{ fontSize: '1.5rem', color: '#2c3e50', fontWeight: 800 }}>Yapay Zeka Yazım Analizi</h3>
+                        </div>
+                        
+                        <div style={{ 
+                          display: 'flex', justifyContent: 'space-around', backgroundColor: '#f8fafc', 
+                          padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0', 
+                          width: '100%', maxWidth: '600px', margin: '0 auto 10px', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' 
+                        }}>
+                          <div style={{ textAlign: 'center', flex: 1 }}>
+                            <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', letterSpacing: '1px' }}>DİSLEKSİ İHTİMALİ</div>
+                            <div style={{ fontSize: '3rem', fontWeight: 900, color: '#3b82f6', lineHeight: 1 }}>{klavyeSonuc.disleksi_yuzdesi}</div>
+                          </div>
+                          
+                          <div style={{ width: '2px', backgroundColor: '#e2e8f0', margin: '0 15px' }}></div>
+                          
+                          <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 700, marginBottom: '12px', letterSpacing: '1px' }}>RİSK SEVİYESİ</div>
+                            <div style={{ 
+                              fontSize: '1.3rem', fontWeight: 800, 
+                              color: klavyeSonuc.is_disleksi ? '#ef4444' : '#10b981',
+                              backgroundColor: klavyeSonuc.is_disleksi ? '#fee2e2' : '#d1fae5',
+                              padding: '10px 24px', borderRadius: '99px', display: 'inline-block'
+                            }}>
+                              {klavyeSonuc.karar.replace('🔴 ', '').replace('🟢 ', '')}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── YAPAY ZEKA TAHMİNLERİ BÖLÜMÜ ── */}
                     {backendSonuc.yapayZekaTahminleri && backendSonuc.yapayZekaTahminleri.length > 0 && (
                       <div style={{ marginTop: '60px', width: '100%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '24px', justifyContent: 'center' }}>
@@ -512,7 +609,7 @@ export default function Analiz() {
                     {/* Aksiyon Butonları */}
                     <div style={{ textAlign: 'center', marginTop: 80, display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
                       <button onClick={() => navigate('/rapor', { state: { analizVerisi: backendSonuc } })} style={{...s.birincilBtn, padding: '16px 40px', fontSize: '1.1rem'}}>Gelişim Raporumu Gör <ArrowRightIcon /></button>
-                      <button onClick={() => { setAdim('klavye'); setKlavyeHamVeriler([]); setCizimHamVeriler([]); setBackendSonuc(null); setCizimAdim(0); setCizimTekrar(0); setHedefHarf(0); setKlavyeTamamlandi(false); setCizimTamamlandi(false); }} style={{...s.ikinciBtn, padding: '16px 40px', fontSize: '1.1rem'}}>Tekrar Başla</button>
+                      <button onClick={() => { setAdim('klavye'); setKlavyeHamVeriler([]); setCizimHamVeriler([]); setBackendSonuc(null); setCizimAdim(0); setCizimTekrar(0); setHedefHarf(0); setKlavyeTamamlandi(false); setCizimTamamlandi(false); setKlavyeSonuc(null); }} style={{...s.ikinciBtn, padding: '16px 40px', fontSize: '1.1rem'}}>Tekrar Başla</button>
                     </div>
                   </div>
                 )}
@@ -564,7 +661,7 @@ function AdimGostergesi({ aktif, tamam, no, label, aciklama }) {
   );
 }
 
-// ─── YENİ: ŞEFFAF SONUÇ SATIRI ───
+// ─── ŞEFFAF SONUÇ SATIRI ───
 function SonucSatiri({ ikon, baslik, deger, aciklama, renk, son }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '24px 0', borderBottom: son ? 'none' : '1px solid rgba(0,0,0,0.06)' }}>
