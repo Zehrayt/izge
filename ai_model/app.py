@@ -5,6 +5,50 @@ import base64
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 
+import torch
+import os
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+import torch.nn as nn
+# ── PyTorch Metin Modeli İskeleti (SENİN ptMODELİN) ──
+alphabet = " abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{}ğüşıöç"
+char2int = {char: i + 1 for i, char in enumerate(alphabet)}
+vocab_size = len(alphabet) + 1
+MAX_LENGTH = 250
+
+def encode_text(text):
+    text = str(text).lower()
+    encoded = [char2int.get(char, 0) for char in text]
+    if len(encoded) > MAX_LENGTH:
+        encoded = encoded[:MAX_LENGTH]
+    else:
+        encoded = encoded + [0] * (MAX_LENGTH - len(encoded))
+    return encoded
+
+class CharCNNDeep(nn.Module):
+    def __init__(self, vocab_size, embed_dim=64, num_filters=256):
+        super(CharCNNDeep, self).__init__()
+        self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=embed_dim, padding_idx=0)
+        self.conv1 = nn.Conv1d(in_channels=embed_dim, out_channels=num_filters, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv1d(in_channels=num_filters, out_channels=num_filters, kernel_size=5, padding=2)
+        self.conv3 = nn.Conv1d(in_channels=num_filters, out_channels=num_filters, kernel_size=7, padding=3)
+        self.relu = nn.ReLU()
+        self.pool = nn.AdaptiveMaxPool1d(1)
+        self.dropout = nn.Dropout(0.5)
+        self.fc1 = nn.Linear(num_filters, 64)
+        self.fc2 = nn.Linear(64, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x = self.embedding(x).transpose(1, 2)
+        x = self.relu(self.conv1(x))
+        x = self.relu(self.conv2(x))
+        x = self.relu(self.conv3(x))
+        x = self.pool(x).squeeze(-1)
+        x = self.dropout(x)
+        x = self.relu(self.fc1(x))
+        x = self.fc2(x)
+        return self.sigmoid(x).squeeze(-1)
+
 app = Flask(__name__)
 
 # ── Model yükleme ──────────────────────────────────────────────────────────────
@@ -17,6 +61,17 @@ try:
 except Exception as e:
     print("❌ Kelime modeli YÜKLENEMEDİ:", e)
     kelime_modeli = None
+
+    # Senin PyTorch Modelin Yükleniyor
+try:
+    PYTORCH_MODEL_YOLU = os.path.join(BASE_DIR, 'disleksi_twitter_wikipedia_2.pth')
+    metin_modeli = CharCNNDeep(vocab_size=vocab_size)
+    metin_modeli.load_state_dict(torch.load(PYTORCH_MODEL_YOLU, map_location=torch.device('cpu')))
+    metin_modeli.eval()
+    print("✅ PyTorch Metin Modeli başarıyla yüklendi!")
+except Exception as e:
+    print("❌ PyTorch Metin Modeli YÜKLENEMEDİ:", e)
+    metin_modeli = None
 
 HARF_SINIFLAR  = {0: 'b', 1: 'd', 2: 'g', 3: 'k', 4: 'p', 5: 'q'}
 KELIME_SINIFLAR = {0: 'baba', 1: 'dede', 2: 'gemi', 3: 'para', 4: 'kalem'}
@@ -102,6 +157,35 @@ def tahmin():
             'karisti': (tahmin_sonuc != hedef) if hedef else False
         })
 
+    except Exception as e:
+        return jsonify({'hata': str(e)}), 500
+    
+    # ── /tahmin-metin (SENİN RÖTAN) ──
+@app.route('/tahmin-metin', methods=['POST'])
+def tahmin_metin():
+    if metin_modeli is None: 
+        return jsonify({'hata': 'PyTorch metin modeli henüz yüklenmedi veya dosya eksik.'}), 500
+    try:
+        veri = request.get_json()
+        gelen_metin = veri.get('metin', '')
+        if not gelen_metin.strip(): 
+            return jsonify({'hata': 'Lütfen bir metin giriniz.'}), 400
+        
+        encoded_metin = encode_text(gelen_metin)
+        tensor_giris = torch.tensor([encoded_metin], dtype=torch.long)
+        
+        with torch.no_grad(): 
+            olasilik = metin_modeli(tensor_giris).item()
+            
+        disleksi_yuzdesi = round(olasilik * 100, 2)
+        karar = "🔴 DİSLEKSİ RİSKİ YÜKSEK" if disleksi_yuzdesi > 50.0 else "🟢 NORMAL"
+        
+        return jsonify({
+            'orijinal_metin': gelen_metin,
+            'disleksi_yuzdesi': f"%{disleksi_yuzdesi}",
+            'karar': karar,
+            'is_disleksi': disleksi_yuzdesi > 50.0
+        })
     except Exception as e:
         return jsonify({'hata': str(e)}), 500
 
