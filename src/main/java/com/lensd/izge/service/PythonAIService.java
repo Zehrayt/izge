@@ -25,6 +25,7 @@ public class PythonAIService {
             Map<String, Object> payload = new HashMap<>();
             payload.put("koordinatlar", cizim.getKoordinatlar());
             payload.put("hedefKarakter", cizim.getHedefKarakter());
+            payload.put("tip", cizim.getTip()); // app.py /tahmin bu alana göre harf ya da kelime modelini seçiyor
 
             String json = objectMapper.writeValueAsString(payload);
 

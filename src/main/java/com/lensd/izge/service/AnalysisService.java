@@ -163,34 +163,6 @@ public class AnalysisService {
         return (int) Math.round(totalError / analizler.size());
     }
 
-    private int calculateHataYuzdesi(String s1, String s2) {
-        if (s1 == null || s1.isEmpty()) return 0;
-        int distance = levenshteinDistance(s1.toLowerCase(), s2.toLowerCase());
-        return Math.min(100, (int) Math.round(((double) distance / s1.length()) * 100));
-    }
-
-    private int levenshteinDistance(String a, String b) {
-        if (a == null) a = "";
-        if (b == null) b = "";
-        int m = a.length();
-        int n = b.length();
-        int[][] dp = new int[m + 1][n + 1];
-
-        for (int i = 0; i <= m; i++) dp[i][0] = i;
-        for (int j = 0; j <= n; j++) dp[0][j] = j;
-
-        for (int i = 1; i <= m; i++) {
-            for (int j = 1; j <= n; j++) {
-                if (a.charAt(i - 1) == b.charAt(j - 1)) {
-                    dp[i][j] = dp[i - 1][j - 1];
-                } else {
-                    dp[i][j] = 1 + Math.min(dp[i - 1][j - 1], Math.min(dp[i - 1][j], dp[i][j - 1]));
-                }
-            }
-        }
-        return dp[m][n];
-    }
-
     private int calculateAverageBackspace(List<KlavyeAnalizDTO> analizler) {
         if (analizler == null || analizler.isEmpty()) return 0;
         return (int) Math.round(analizler.stream().mapToInt(KlavyeAnalizDTO::getSilmeSayisi).average().orElse(0));
