@@ -329,18 +329,204 @@ function bionicFormat(rawText) {
   });
 }
 
+/* ─── YARDIMCI: Sayfa dışındaki koyu arka planı (masa, gölge vb.) otomatik kırp ─
+ * Fotoğrafta kitap sayfasının etrafında kalan masa/zemin gibi koyu alanlar
+ * OCR'a karışıp anlamsız "kelimeler" üretebiliyor (metnin sonunda görülen
+ * rastgele harf öbekleri gibi). Satır/sütun bazında parlaklık oranına bakıp
+ * sayfanın (parlak, beyaza yakın) sınırlarını buluyoruz.                    */
+function sayfayaOtomatikKirp(canvas) {
+  const ctx = canvas.getContext('2d');
+  const { width, height } = canvas;
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+
+  const gray = new Float32Array(width * height);
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    gray[p] = Math.max(data[i], data[i + 1], data[i + 2]);
+  }
+
+  const PARLAKLIK_ESIGI = 150;
+  const ORAN_ESIGI = 0.5;
+
+  const satirParlakOrani = (y) => {
+    let sayim = 0;
+    for (let x = 0; x < width; x++) if (gray[y * width + x] > PARLAKLIK_ESIGI) sayim++;
+    return sayim / width;
+  };
+  const sutunParlakOrani = (x, y0, y1) => {
+    let sayim = 0;
+    for (let y = y0; y <= y1; y++) if (gray[y * width + x] > PARLAKLIK_ESIGI) sayim++;
+    return sayim / (y1 - y0 + 1);
+  };
+
+  let ustY = 0, altY = height - 1;
+  for (let y = 0; y < height; y++) { if (satirParlakOrani(y) >= ORAN_ESIGI) { ustY = y; break; } }
+  for (let y = height - 1; y >= 0; y--) { if (satirParlakOrani(y) >= ORAN_ESIGI) { altY = y; break; } }
+
+  let solX = 0, sagX = width - 1;
+  for (let x = 0; x < width; x++) { if (sutunParlakOrani(x, ustY, altY) >= ORAN_ESIGI) { solX = x; break; } }
+  for (let x = width - 1; x >= 0; x--) { if (sutunParlakOrani(x, ustY, altY) >= ORAN_ESIGI) { sagX = x; break; } }
+
+  const genislik = sagX - solX + 1;
+  const yukseklik = altY - ustY + 1;
+
+  // Tespit başarısız olduysa (çok küçük bir alan bulunduysa) orijinali kullan
+  if (genislik < width * 0.3 || yukseklik < height * 0.3) return canvas;
+
+  const kirpilmis = document.createElement('canvas');
+  kirpilmis.width = genislik;
+  kirpilmis.height = yukseklik;
+  kirpilmis.getContext('2d').drawImage(canvas, solX, ustY, genislik, yukseklik, 0, 0, genislik, yukseklik);
+  return kirpilmis;
+}
+
 /* ─── YARDIMCI: Görüntü ön işleme ──────────────────────────────────────────── */
 function preprocessImage(canvas) {
-  const ctx = canvas.getContext('2d');
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-    const color = avg > 130 ? 255 : 0;
-    data[i] = data[i + 1] = data[i + 2] = color;
+  // 0) Sayfa dışındaki koyu arka planı (masa, gölge vb.) otomatik kırp
+  canvas = sayfayaOtomatikKirp(canvas);
+
+  // 1) Düşük çözünürlüklü fotoğrafları büyüt — OCR doğruluğu çözünürlükle artar
+  const MIN_WIDTH = 1600;
+  if (canvas.width < MIN_WIDTH) {
+    const scale = MIN_WIDTH / canvas.width;
+    const buyuk = document.createElement('canvas');
+    buyuk.width = Math.round(canvas.width * scale);
+    buyuk.height = Math.round(canvas.height * scale);
+    const bctx = buyuk.getContext('2d');
+    bctx.imageSmoothingEnabled = true;
+    bctx.imageSmoothingQuality = 'high';
+    bctx.drawImage(canvas, 0, 0, buyuk.width, buyuk.height);
+    canvas = buyuk;
   }
+
+  const ctx = canvas.getContext('2d');
+  const { width, height } = canvas;
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+
+  // 2) Griye çevir — ağırlıklı luminance yerine kanalların maksimumu (value) kullanılıyor.
+  //    Bu, sarı/yeşil/pembe fosforlu kalemle vurgulanmış metinlerde önemli:
+  //    sarı (255,255,0) luminance ile orta-koyu griye düşüp metin kontrastını
+  //    azaltıyordu; max(R,G,B) ile sarı da beyaz kağıt gibi parlak kalıyor,
+  //    siyah mürekkep ise her iki yöntemde de koyu kalıyor.
+  const gray = new Float32Array(width * height);
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    gray[p] = Math.max(data[i], data[i + 1], data[i + 2]);
+  }
+
+  // 3) Sayfayı bloklara ayırıp her blok için yerel ortalama aydınlatma hesapla.
+  //    Bu, fotoğraflanan kitap sayfalarındaki düzensiz ışık/gölge/kıvrımı
+  //    tek bir sabit eşik (global threshold) yerine bölgesel olarak tolere eder.
+  const BLOCK = 40;
+  const cols = Math.ceil(width / BLOCK);
+  const rows = Math.ceil(height / BLOCK);
+  const blockMean = new Float32Array(cols * rows);
+
+  for (let by = 0; by < rows; by++) {
+    for (let bx = 0; bx < cols; bx++) {
+      let sum = 0, count = 0;
+      const x0 = bx * BLOCK, y0 = by * BLOCK;
+      const x1 = Math.min(x0 + BLOCK, width), y1 = Math.min(y0 + BLOCK, height);
+      for (let y = y0; y < y1; y++) {
+        for (let x = x0; x < x1; x++) {
+          sum += gray[y * width + x];
+          count++;
+        }
+      }
+      blockMean[by * cols + bx] = sum / count;
+    }
+  }
+
+  // 4) Her pikseli, içinde bulunduğu bloğun yerel ortalamasına göre eşikle (adaptif binarizasyon)
+  const C = 12; // eşik hassasiyeti — ince gölgeleri metinden ayırmak için tampon
+  for (let y = 0; y < height; y++) {
+    const by = Math.min(rows - 1, Math.floor(y / BLOCK));
+    for (let x = 0; x < width; x++) {
+      const bx = Math.min(cols - 1, Math.floor(x / BLOCK));
+      const localMean = blockMean[by * cols + bx];
+      const idx = (y * width + x) * 4;
+      const v = gray[y * width + x] > localMean - C ? 255 : 0;
+      data[idx] = data[idx + 1] = data[idx + 2] = v;
+    }
+  }
+
   ctx.putImageData(imageData, 0, 0);
   return canvas.toDataURL('image/png', 1.0);
+}
+
+/* ─── YARDIMCI: OCR sonucunu satır/paragraf yapısından yeniden kur ─────────── *
+ * Tesseract'ın ham `text` çıktısı kitaptaki fiziksel satır sonlarını olduğu
+ * gibi korur (her basılı satır = bir \n) ve düşük güvenilirlikli gürültü
+ * kelimelerini (örn. tek başına "v.") filtrelemez. Bunun yerine `paragraphs
+ * → lines → words` hiyerarşisini kullanarak:
+ *   1) Güven skoru düşük kelimeleri at (OCR gürültüsü),
+ *   2) Satır sonu tire ile bölünmüş kelimeleri birleştir,
+ *   3) Aynı paragraf içindeki satırları boşlukla birleştirip tek bir akan
+ *      metin oluştur — böylece ekran genişliğine göre doğal satır kaydırma
+ *      (reflow) olur, kitaptaki satır kırılmaları uygulamaya taşınmaz.       */
+const MIN_GUVEN = 50; // bu eşiğin altındaki kelimeler OCR gürültüsü kabul edilip atılır
+
+// Bir kelimenin gerçek metin mi yoksa OCR gürültüsü mü olduğunu belirler.
+// Fotoğraflanan kitap sayfalarında leke/gölge/kıvrım gibi şeyler genelde
+// tek başına ":" "!" ";" "v." "İ" gibi anlamsız tek-karakterli/saf noktalama
+// "kelimeler" olarak okunur — bunlar gerçek metinde ayrı bir token olarak
+// neredeyse hiç bulunmaz, o yüzden agresifçe eleniyor.
+function temizKelimeMi(kelime, guven) {
+  const k = (kelime || '').trim();
+  if (!k) return false;
+  // Saf noktalama/sembol (harf/rakam içermeyen) tokenler her zaman gürültüdür
+  if (!/[\wğüşıöçĞÜŞİÖÇ]/.test(k)) return false;
+  // Tek harfli tokenler — Türkçede "o" dışında pratikte tek harfli kelime yoktur
+  const sadeceHarfRakam = k.replace(/[^\wğüşıöçĞÜŞİÖÇ]/g, '');
+  if (sadeceHarfRakam.length === 1 && !/^[oO]$/.test(sadeceHarfRakam)) return false;
+  if (guven < MIN_GUVEN) return false;
+  return true;
+}
+
+function metniYenidenOlustur(data) {
+  // Tesseract'ın kendi "paragraph" gruplaması güvenilir değil — adaletli/blok
+  // dizilmiş kitap sayfalarında genelde her satırı ayrı bir paragraf gibi
+  // algılıyor. Onun yerine tüm satırları okuma sırasıyla düz bir listeye
+  // alıp, paragraf başlangıcını kendimiz GİRİNTİ (indent) bilgisinden tespit
+  // ediyoruz — Türkçe kitaplarda paragrafın ilk satırı içeri girintili başlar,
+  // bu da satır kutusunun (bbox) sol kenarından (x0) anlaşılabilir.
+  const satirlarHam = (data && data.lines) || [];
+  if (!satirlarHam.length) return (data?.text || '').trim();
+
+  const satirBilgileri = satirlarHam
+    .map((line) => ({
+      metin: (line.words || [])
+        .filter((w) => temizKelimeMi(w.text, w.confidence))
+        .map((w) => w.text.trim())
+        .join(' '),
+      x0: line.bbox ? line.bbox.x0 : 0,
+    }))
+    .filter((s) => s.metin.length > 0);
+
+  if (!satirBilgileri.length) return '';
+
+  // Sayfanın genel sol kenarını (çoğu satırın hizalandığı x) medyan ile bul
+  const x0ler = [...satirBilgileri.map((s) => s.x0)].sort((a, b) => a - b);
+  const solKenar = x0ler[Math.floor(x0ler.length / 2)];
+  const GIRINTI_ESIGI = 18; // px — bu kadar daha içeride başlayan satır yeni paragraf kabul edilir
+
+  let sonuc = '';
+  satirBilgileri.forEach((satir, i) => {
+    const yeniParagrafMi = i > 0 && (satir.x0 - solKenar) > GIRINTI_ESIGI;
+
+    if (i === 0) {
+      sonuc = satir.metin;
+    } else if (yeniParagrafMi) {
+      sonuc += '\n\n' + satir.metin;
+    } else if (/[a-zA-ZğüşıöçĞÜŞİÖÇ]-$/.test(sonuc)) {
+      // Önceki satır tire ile bitiyor (kelime alt satırda devam ediyor) — boşluksuz birleştir
+      sonuc = sonuc.slice(0, -1) + satir.metin;
+    } else {
+      sonuc += ' ' + satir.metin;
+    }
+  });
+
+  return sonuc.trim();
 }
 
 /* ─── ANA BİLEŞEN ──────────────────────────────────────────────────────────── */
@@ -399,10 +585,15 @@ export default function OkumaAsistani() {
               setStatus(`Tarama: %${Math.floor(m.progress * 100)}`);
             }
           },
-          tessedit_pageseg_mode: '1',
+          tessedit_pageseg_mode: '3', // Tam otomatik sayfa segmentasyonu (OSD gerektirmez, kitap sayfaları için daha güvenilir)
           preserve_interword_spaces: '1',
-        }).then(({ data: { text: t } }) => {
-          const clean = t.replace(/[^\w\sğüşıöçĞÜŞİÖÇ.,!?;:()\-\n]/g, ' ').replace(/\s{3,}/g, '\n\n').trim();
+        }).then(({ data }) => {
+          const yenidenKurulmus = metniYenidenOlustur(data);
+          const clean = yenidenKurulmus
+            .replace(/[^\w\sğüşıöçĞÜŞİÖÇ.,!?;:()\-]/g, ' ') // izin verilmeyen karakterleri temizle (satır sonlarına dokunmaz)
+            .replace(/ {2,}/g, ' ') // sadece boşlukları sıkıştır, paragraf aralarındaki \n\n'e dokunma
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
           setText(clean);
           setStatus('Tamamlandı ✓');
           setProgress(100);
