@@ -31,4 +31,4 @@ build/
 
 ### VS Code ###
 .vscode/
-ai_model/izge_env/
+ai_model/izge_env/ai_model/venv/
