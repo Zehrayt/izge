@@ -44,7 +44,7 @@ Dislekside en sık karıştırılan 6 harfe odaklanan özelleştirilmiş modeldi
 * [EMNIST ByClass](https://www.tensorflow.org/datasets/catalog/emnist) içinden yalnızca bu 6 harfin etiketleri filtrelenmiş ve temel modele Transfer Learning uygulanmıştır.
 * Gerçek çizim koşullarını taklit etmek için `cv2.erode` ile morfolojik inceltme yapılmıştır.
 
-### 3. [PyTorch Kelime Çizim Modeli (IzgeHafifCNN)](https://drive.google.com/file/d/13AW2s7y1ak6wRPQmnvoLo_cdzgciBIiz/view?usp=sharing)
+### 3. [PyTorch Kelime Çizim Modeli (IzgeHafifCNN)](https://colab.research.google.com/drive/1U5o8Hg4XdpdG0IueHr_z2kWoE_6RAOYh?usp=sharing)
 Kullanıcının Canvas üzerine çizdiği kelimeleri (baba, dede, gemi, kalem, para) tanıyan görüntü sınıflandırma modelidir. **PyTorch** ile eğitilmiş olup `izge_kelime_model.pth` dosyasına kaydedilir.
 
 * **Veri Seti:** Hazır bir veri seti kullanılmamıştır — ekip üyeleri tarafından bu 5 kelime, ekrana elle çizilerek **1050 adet özgün el yazısı görseli** olarak toplanmış ve etiketlenmiştir.
