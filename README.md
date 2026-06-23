@@ -60,10 +60,49 @@ Kullanıcının Canvas üzerine çizdiği kelimeleri (baba, dede, gemi, kalem, p
   | kalem   | 0.93      | 0.87   | 0.90     |
   | para    | 0.83      | 1.00   | 0.91     |
 
-### 4. PyTorch Yazım (Klavye) Analiz Modeli (CharCNN)
+### 4. [PyTorch Yazım (Klavye) Analiz Modeli (CharCNN)] (https://colab.research.google.com/drive/1qFj0ZhLEbyeThpuzhiFhR-uvhvMNzdl_?usp=sharing)
 Kullanıcının serbest metin girişlerindeki yazım hatalarını ve klavye ritmini **CharCNN** altyapısıyla analiz ederek disleksi risk skoru üreten NLP modelidir. `disleksi_twitter_wikipedia_2.pth` dosyasına kaydedilir.
 
-* Harf dizilişlerindeki ardışık anomalileri yakalamak için **Türkçe Wikipedia** ve **Twitter (X)** veri setleriyle eğitilmiştir.
+* Harf dizilişlerindeki anomalileri yakalamak için kullanılan modeli eğitmek ve veri üretmek için [Hugging Face](https://huggingface.co/) üzerindeki şu veri setlerinden faydalanılmıştır:
+
+- **[Türkçe Twitter Veri Seti](https://huggingface.co/datasets/winvoker/turkish-sentiment-analysis-dataset):** Projede sosyal medya dilini ve klavye hatalarını (typo) modelleyebilmek için Twitter verileri çekildi.
+- **[Alternatif Twitter (Offensive) Seti](https://huggingface.co/datasets/Toygar/turkish-offensive-language-detection):** Ana veri setinde kesinti olması durumunda yedek Twitter kaynağı olarak kullanıldı.
+- **[Wikipedia TR Seti](https://huggingface.co/datasets/wikimedia/wikipedia):** Kurallı ve temiz Türkçe (Normal-0) cümle yapılarını modele öğretmek için kullanıldı.
+Sadece Wikipedia kullanılmaması yanında Twitter verisinin kullanılma sebebi modelin sadece akademik  cümleleri normal kabul etmesini engellemek, modele günlük dili öğretmektir.
+
+Model, karakter dizilimlerindeki anomalileri yakalamak amacıyla ardışık 1-Boyutlu Evrişim Katmanlarından (1D CNN) oluşan bir yapıya sahiptir:
+
+* **Embedding:** Girişteki 250 karakter uzunluğundaki seyrek diziler, `nn.Embedding(78, 64)` katmanı ile yoğun vektör uzayına çevrilir.
+* **CNN Bloğu (1D CNN):** Ardışık üç adet `nn.Conv1d` katmanı (Filtre Sayısı: 256; Kernel Boyutları: 3, 5, 7) kullanılarak mikro düzeydeki anlık tipografik hatalardan (typo), hece yutulmalarına ve makro düzeydeki bütünsel morfolojik bozulmalara kadar geniş bir spektrumda hata taraması gerçekleştirilir.
+* **Pooling ve Dropout:** `AdaptiveMaxPool1d` katmanı ile zamansal boyuttaki en baskın hata sinyalleri süzülür. Fully connected katman öncesinde modelin ezberlemesini önlemek amacıyla **%50 Dropout** regülasyonu uygulanır.
+* **Dense Layers:** Öznitelikler iki aşamalı doğrusal katmandan (`Linear: 256 -> 64 -> 1`) geçirilip `Sigmoid` aktivasyon fonksiyonu ile normalize edilerek `[0.0, 1.0]` aralığında olasılıksal bir disleksi risk skoru üretilir.
+
+  
+Modelin optimizasyon sürecinde kullanılan hiperparametre konfigürasyonları aşağıda listelenmiştir:
+
+* **Yığın Boyutu (Batch Size):** 64
+* **Öğrenme Oranı (Learning Rate):** 0.001
+* **Eğitim Döngüsü (Epochs):** 15
+* **Kayıp Fonksiyonu (Loss Function):** `BCELoss` (Binary Cross Entropy Loss)
+* **Optimizasyon Algoritması:** `Adam` (Adaptive Moment Estimation)
+* **Veri Kümesi Bölümlemesi:** %80 Eğitim (Train), %10 Doğrulama (Validation), %10 Test (Katmanlı/Stratified örnekleme ile sınıf dengesi korunmuştur).
+
+Modelin sınıflandırma performansı, eğitim sürecine dahil edilmeyen **4641 örneklemden** oluşan  test seti üzerinde değerlendirilmiştir. Sınıf bazlı metrikler, makro ve ağırlıklı ortalamalar ile modelin genel başarım tablosu aşağıda sunulmuştur:
+
+| Sınıf / Metrik | Kesinlik (Precision) | Duyarlılık (Recall) | F1-Skoru | Destek Örneği (Support) |
+| :--- | :---: | :---: | :---: | :---: |
+| **Normal (0)** | 0.91 | 0.97 | 0.94 | 2669 |
+| **Disleksi (1)** | 0.96 | 0.86 | 0.91 | 1972 |
+| **Genel Doğruluk (Accuracy)** | | | **0.92** | **4641** |
+| **Makro Ortalama (Macro Avg)** | 0.93 | 0.92 | 0.92 | 4641 |
+| **Ağırlıklı Ortalama (Weighted Avg)** | 0.93 | 0.92 | 0.92 | 4641 |
+
+Test sürecinde modelin ürettiği tahminlerin gerçek etiketlerle olan confusion matrisi  şu şekildedir:
+
+| | **Tahmin: Normal (0)** | **Tahmin: Disleksi (1)** |
+| :--- | :---: | :---: |
+| **Gerçek: Normal (0)** | **2589 (Doğru Negatif)** | 80 (Yalancı Pozitif) |
+| **Gerçek: Disleksi (1)** | 270 (Yalancı Negatif) | **1702 (Doğru Pozitif)** |
 
 ---
 
