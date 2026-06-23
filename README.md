@@ -60,7 +60,7 @@ Kullanıcının Canvas üzerine çizdiği kelimeleri (baba, dede, gemi, kalem, p
   | kalem   | 0.93      | 0.87   | 0.90     |
   | para    | 0.83      | 1.00   | 0.91     |
 
-### 4. [PyTorch Yazım (Klavye) Analiz Modeli (CharCNN)] (https://colab.research.google.com/drive/1qFj0ZhLEbyeThpuzhiFhR-uvhvMNzdl_?usp=sharing)
+### 4. [PyTorch Yazım (Klavye) Analiz Modeli (CharCNN)](https://colab.research.google.com/drive/1qFj0ZhLEbyeThpuzhiFhR-uvhvMNzdl_?usp=sharing)
 Kullanıcının serbest metin girişlerindeki yazım hatalarını ve klavye ritmini **CharCNN** altyapısıyla analiz ederek disleksi risk skoru üreten NLP modelidir. `disleksi_twitter_wikipedia_2.pth` dosyasına kaydedilir.
 
 * Harf dizilişlerindeki anomalileri yakalamak için kullanılan modeli eğitmek ve veri üretmek için [Hugging Face](https://huggingface.co/) üzerindeki şu veri setlerinden faydalanılmıştır:
