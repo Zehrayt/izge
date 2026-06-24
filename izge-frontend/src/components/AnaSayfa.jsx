@@ -128,7 +128,7 @@ export default function AnaSayfa() {
           gap: '40px', // Aralarındaki minimum güvenli boşluk
           padding: '40px clamp(20px, 5vw, 80px)',
           width: '100%',
-          maxWidth: '1400px', // Daha geniş bir alana yayılmaları için limiti artırdık
+          maxWidth: '1400px', 
           margin: '0 auto'
         }}>
           <div style={featureStyle}>
@@ -212,13 +212,12 @@ export default function AnaSayfa() {
             justifyContent: 'center',
             border: '2px dashed rgba(255,255,255,0.8)'
           }}>
-            {/* Oraya ekleyeceğin görsel hazır olduğunda şu kodu kullanabilirsin: */}
+            {/* görseller hazır olduğunda kullanacağımız kod: */}
             {/* <img src="/senin-resmin.jpg" alt="Ekip" style={{ width: '100%', height: '100%', borderRadius: '30px', objectFit: 'cover' }} /> */}
             <span style={{ color: '#2c3e50', fontWeight: 'bold', fontSize: '1.1rem' }}>[ Buraya Görsel Gelecek ]</span>
           </div>
         </div>
 
-        {/* EKİBİMİZ BÖLÜMÜ */}
         {/* EKİBİMİZ BÖLÜMÜ */}
         <div style={{ marginTop: '80px', padding: '0 20px' }}>
           

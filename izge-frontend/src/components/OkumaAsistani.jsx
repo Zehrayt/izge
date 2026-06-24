@@ -329,7 +329,7 @@ function bionicFormat(rawText) {
   });
 }
 
-/* ─── YARDIMCI: Sayfa dışındaki koyu arka planı (masa, gölge vb.) otomatik kırp ─
+/* Sayfa dışındaki koyu arka planı (masa, gölge vb.) otomatik kırp ─
  * Fotoğrafta kitap sayfasının etrafında kalan masa/zemin gibi koyu alanlar
  * OCR'a karışıp anlamsız "kelimeler" üretebiliyor (metnin sonunda görülen
  * rastgele harf öbekleri gibi). Satır/sütun bazında parlaklık oranına bakıp
@@ -380,7 +380,7 @@ function sayfayaOtomatikKirp(canvas) {
   return kirpilmis;
 }
 
-/* ─── YARDIMCI: Görüntü ön işleme ──────────────────────────────────────────── */
+/* Görüntü ön işleme ──────────────────────────────────────────── */
 function preprocessImage(canvas) {
   // 0) Sayfa dışındaki koyu arka planı (masa, gölge vb.) otomatik kırp
   canvas = sayfayaOtomatikKirp(canvas);
@@ -454,7 +454,7 @@ function preprocessImage(canvas) {
   return canvas.toDataURL('image/png', 1.0);
 }
 
-/* ─── YARDIMCI: OCR sonucunu satır/paragraf yapısından yeniden kur ─────────── *
+/* OCR sonucunu satır/paragraf yapısından yeniden kur ─────────── *
  * Tesseract'ın ham `text` çıktısı kitaptaki fiziksel satır sonlarını olduğu
  * gibi korur (her basılı satır = bir \n) ve düşük güvenilirlikli gürültü
  * kelimelerini (örn. tek başına "v.") filtrelemez. Bunun yerine `paragraphs
