@@ -47,7 +47,7 @@ Dislekside en sık karıştırılan 6 harfe odaklanan özelleştirilmiş modeldi
 ### 3. [PyTorch Kelime Çizim Modeli (IzgeHafifCNN)](https://colab.research.google.com/drive/1U5o8Hg4XdpdG0IueHr_z2kWoE_6RAOYh?usp=sharing)
 Kullanıcının Canvas üzerine çizdiği kelimeleri (baba, dede, gemi, kalem, para) tanıyan görüntü sınıflandırma modelidir. **PyTorch** ile eğitilmiş olup `izge_kelime_model.pth` dosyasına kaydedilir.
 
-* **Veri Seti:** Hazır bir veri seti kullanılmamıştır — ekip üyeleri tarafından bu 5 kelime, ekrana elle çizilerek **1050 adet özgün el yazısı görseli** olarak toplanmış ve etiketlenmiştir.
+* **Veri Seti:** * **Veri Seti:** Hazır bir veri seti kullanılmamıştır — ekip üyeleri tarafından bu 5 kelime, ekrana elle çizilerek **1050 adet özgün el yazısı görseli** olarak toplanmış ve etiketlenmiştir. [Veri setine buradan ulaşabilirsiniz.](https://drive.google.com/file/d/1fbF3g4CZ7wXfSAJ4ni09AqMyM5JR0psl/view?usp=share_link)
 * **Mimari:** 2 katmanlı `Conv2d` + `BatchNorm2d` + `MaxPool2d` bloğu (16 → 32 filtre), ardından tam bağlantılı katmanlar ve `Dropout(0.5)` ile overfitting önlemi.
 * **Giriş Boyutu:** `(batch, 1, 32, 128)` — yükseklik 32, genişlik 128 piksel gri tonlamalı görüntü.
 * **Test Sonuçları:** 158 örneklik test setinde **%91 genel doğruluk (accuracy)** elde edilmiştir.
