@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import logo from '../assets/images/Resim1.png';
 import cocukResmi from '../assets/images/IMG_3029.png';
 import arkaPlan from '../assets/images/alt.png';
+import anaEkranGorseli from '../assets/images/anaekranekeleme.jpeg';
 
 import analizIkon from '../assets/images/analiz.png';
 import biyonikIkon from '../assets/images/biyonik.png';
@@ -199,22 +200,25 @@ export default function AnaSayfa() {
             </p>
           </div>
 
-          {/* Resim Alanı (Placeholder) */}
-          <div style={{ 
-            flex: '1', 
+          {/* Resim Alanı */}
+          <div style={{
+            flex: '1',
             minWidth: '300px',
-            maxWidth: '500px', 
-            height: '350px', 
-            backgroundColor: 'rgba(255,255,255,0.4)', 
+            maxWidth: '500px',
+            height: '350px',
+            backgroundColor: 'transparent',
             borderRadius: '30px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            border: '2px dashed rgba(255,255,255,0.8)'
+            overflow: 'hidden',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
           }}>
-            {/* görseller hazır olduğunda kullanacağımız kod: */}
-            {/* <img src="/senin-resmin.jpg" alt="Ekip" style={{ width: '100%', height: '100%', borderRadius: '30px', objectFit: 'cover' }} /> */}
-            <span style={{ color: '#2c3e50', fontWeight: 'bold', fontSize: '1.1rem' }}>[ Buraya Görsel Gelecek ]</span>
+            <img
+              src={anaEkranGorseli}
+              alt="İzge Ana Ekran"
+              style={{ width: '100%', height: '100%', borderRadius: '30px', objectFit: 'cover' }}
+            />
           </div>
         </div>
 
